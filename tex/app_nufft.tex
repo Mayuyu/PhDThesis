@@ -1,0 +1,50 @@
+%# -*- coding: utf-8-unix -*-
+\chapter{质量和能量守恒的证明}
+\label{app_nufft}
+
+% In this appendix, we briefly present the proof for mass and energy conservation.  We assume the wave function lies in 
+% Schwartz space $S(\mathbb R^d)$ hereafter.
+在本附录中，我们简要介绍了第四章中薛定谔方程的质量和能量守恒的证明。我们假设波函数在
+Schwartz空间$S(\mathbb R^d)$中。
+
+\section{质量守恒}
+\begin{proof}
+对于$u^{\varepsilon}\in C(\mathbb{R}_t;L^2(\mathbb{R}^d))$，首先注意到$(-i\varepsilon\nabla-\mathbf{A})$是自共轭算子，即，
+\begin{equation}
+\langle(-i\varepsilon\nabla-\mathbf{A})f,g\rangle=-i\varepsilon\langle\nabla f,g\rangle-\langle\mathbf{A}f,g\rangle
+=\langle f,(-i\varepsilon\nabla-\mathbf{A})g\rangle.
+\end{equation}
+直接计算得出
+\begin{equation}\nonumber
+\frac{d}{dt}\| u^{\varepsilon}\|_{L^2}=\frac{d}{dt}\langle u^{\varepsilon},u^{\varepsilon}\rangle=\langle\partial_t u^{\varepsilon},u^{\varepsilon}\rangle+\langle u^{\varepsilon},\partial_t u^{\varepsilon}\rangle =0.
+\end{equation}
+\end{proof}
+\vspace{-1.0cm}
+\section{能量守恒}
+\begin{proof}
+对$\mathcal E(t)$求导，我们有 
+\[
+\frac{d}{dt}\mathcal E(t)=(I)+(II),
+\]
+其中
+\begin{align*}
+(I)&:=\frac{1}{2}\langle(-i\varepsilon\nabla-\mathbf{A})\partial_t u^{\varepsilon},(-i\varepsilon\nabla-\mathbf{A})u^{\varepsilon}\rangle+\frac{1}{2}\langle (-i\varepsilon\nabla-\mathbf{A})u^{\varepsilon},(-i\varepsilon\nabla-\mathbf{A})\partial_t u^{\varepsilon}\rangle, \\
+(II)&:=\langle\partial_t u^{\varepsilon},Vu^{\varepsilon}\rangle+\langle u^{\varepsilon},V\partial_t u^{\varepsilon}\rangle.
+\end{align*}
+由$(-i\varepsilon\nabla-\mathbf{A})$是自共轭算子，我们有
+\begin{align*}
+(I)=&\frac{1}{2}\langle(-i\varepsilon\nabla-\mathbf{A})\left(\frac{1}{2i\varepsilon}(-i\varepsilon\nabla-\mathbf{A})^2 u^{\varepsilon}+\frac{V}{i\varepsilon}u^{\varepsilon}\right),(-i\varepsilon\nabla-\mathbf{A})u^{\varepsilon}\rangle\\
+&+\frac{1}{2}\langle(-i\varepsilon\nabla-\mathbf{A})u^{\varepsilon},(-i\varepsilon\nabla-\mathbf{A})\left(\frac{1}{2i\varepsilon}(-i\varepsilon\nabla-\mathbf{A})^2 u^{\varepsilon}+\frac{V}{i\varepsilon}u^{\varepsilon}\right)\rangle\\
+=&\frac{1}{2}\langle\frac{1}{2i\varepsilon}(-i\varepsilon\nabla-\mathbf{A})^2 u^{\varepsilon}+\frac{V}{i\varepsilon}u^{\varepsilon},(-i\varepsilon\nabla-\mathbf{A})^2u^{\varepsilon}\rangle\\
+&+\frac{1}{2}\langle(-i\varepsilon\nabla-\mathbf{A})^2 u^{\varepsilon},\frac{1}{2i\varepsilon}(-i\varepsilon\nabla-\mathbf{A})^2 u^{\varepsilon}+\frac{V}{i\varepsilon}u^{\varepsilon}\rangle\\
+=&\frac{1}{2i\varepsilon}\langle Vu^{\varepsilon},(-i\varepsilon\nabla-\mathbf{A})^2 u^{\varepsilon}\rangle-\frac{1}{2i\varepsilon}\langle(-i\varepsilon\nabla-\mathbf{A})^2 u^{\varepsilon},Vu^{\varepsilon}\rangle. 
+\end{align*}
+类似的，
+\begin{align*}
+(II)=&\langle \frac{1}{2i\varepsilon}(-i\varepsilon\nabla-\mathbf{A})^2 u^{\varepsilon}+\frac{V}{i\varepsilon}u^{\varepsilon},Vu^{\varepsilon}\rangle+\langle Vu^{\varepsilon},\frac{1}{2i\varepsilon}(-i\varepsilon\nabla-\mathbf{A})^2 u^{\varepsilon}
++\frac{V}{i\varepsilon}u^{\varepsilon}\rangle \\
+=&\frac{1}{2i\varepsilon}\langle(-i\varepsilon\nabla-\mathbf{A})^2 u^{\varepsilon},Vu^{\varepsilon}\rangle-\frac{1}{2i\varepsilon}\langle Vu^{\varepsilon},(-i\varepsilon\nabla-\mathbf{A})^2 u^{\varepsilon}\rangle = -(I).
+\end{align*}
+因此我们有$(I)+(II)=0$，也就说明了$\mathcal E(t) = \mathcal E(0)$。
+\end{proof}
+

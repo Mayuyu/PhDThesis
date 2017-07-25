@@ -1,0 +1,59 @@
+% !TeX root = ../thesis.tex
+%# -*- coding: utf-8-unix -*-
+%%==================================================
+%% abstract.tex for SJTU Master Thesis
+%%==================================================
+
+\begin{abstract}
+
+首先，我们提出了一种基于广义多项式混沌（gPC）的随机伽辽金方法（SG）用于计算具有随机和奇异系数的双曲方程。由于解的奇异性，标准gPC-SG方法收敛速度会很慢甚至不收敛。通过利用中心型有限差分或有限体积方法的离散解在空间和时间上较为光滑的特性，我们先离散原方程，然后再使用gPC-SG近似离散的系统。间断处的界面条件使用\citen{Jin:2009pro,Wen:2005ueba}中的方法处理，这样整个方法具有很快的收敛速度，对于固定的网格大小和时间步长其为谱收敛。我们使用带有不连续和随机系数的线性对流方程，以及带有不连续和随机的势能Liouville方程作为例子来说明我们的想法，提出了一阶和二阶的格式，并用数值例子验证了我们的想法。
+
+其次，我们研究随机输入和扩散尺度下的线性传输方程的随机伽辽金方法。我们首先建立解在随机空间一致的（关于克努恩数）正则性结果，然后证明随机伽辽金方法的一致谱收敛（以及推出的随机渐近保持特性）。提出了对于该问题采用基于micro-macro分解的全离散格式，并证明其具有一致的稳定性。大量的数值实验用以证明该方法的稳定性和渐近性质。
+
+第三，我们提出了一种用于具有向量势的半经典薛定谔方程的新的时间分裂傅立叶谱方法。
+与\citen {SemiJZ}的结果相比，我们的方法通过应用非均匀快速傅里叶变换（NUFFT）算法，使得对流步中傅立叶谱插值的使用变得可行。该算法在保持傅里叶方法的高空间精度的同时，效率上从$ O(N^{2})$（直接计算）提高到$ O(N\log N)$，其中$N$是网格点的总数。动能步骤和势能步骤通过具有伪谱近似的解析解来解决，
+因此，我们在整个方法中获得了空间的谱精度。
+我们证明该方法是无条件稳定的，并且我们对波函数和物理观察值进行了改进的误差估计，这与\citen{BaoJM}中不带有向量势能的结果一致，并且优于\citen {SemiJZ} 。我们进行了大量的一维和二维数值研究来验证所提出的方法的性质，并展示了3D问题的仿真，以展示其未来实际应用的潜力。
+
+最后，我们研究带Caputo导数（分数阶）的标量守恒定律的数值近似，该方程的特点是引入了记忆效应。 我们构造了这种方程的一阶和二阶显式迎风格式，这些格式被证明为有条件的$\ell^ 1$递减以及TVD的。 然而，Caputo导数存在使得我们得到修正的CFL稳定性条件，即$(\Delta t)^{\alpha} = O(\Delta x)$，其中$\alpha \in (0,1]$是分数。当$\alpha $很小时，这样强的约束使得数值实现非常不切实际，然后我们提出了隐式迎风格式来克服这个问题，这被证明是无条件的$\ell^1$递减和TVD的。我们进行了了各种数值实验来验证方法的性质，并提供了更多的数值证据来解释守恒律中的记忆效应。
+
+\keywords{\large 双曲方程 \quad 随机系数 \quad 势垒 \quad 随机伽辽金方法 \quad 多项式混沌 \quad 线性输运方程 \quad 随机输入 \quad 扩散极限 \quad 不确定量化 \quad 渐近保持格式 \quad 半经典薛定谔方程 \quad 向量势 \quad 半拉格朗日时间分裂方法 \quad 非均匀快速傅立叶变换}
+\end{abstract}
+
+\begin{englishabstract}
+
+First, we develop a generalized polynomial chaos (gPC) based stochastic Galerkin (SG) for
+hyperbolic equations with random and singular coefficients. Due to the singular nature of the solution, the standard gPC-SG methods may suffer from a poor or even
+non convergence. Taking advantage of the fact that the discrete solution,
+by the central type  finite difference or finite volume approximations
+in space and time for example, is smoother, we first discretize the equation by a smooth finite difference or
+finite volume scheme, and then use the gPC-SG approximation to the discrete
+system. The jump condition at the interface is treated using the immersed
+upwind methods introduced in \citen{Jin:2009pro, Wen:2005ueba}.
+This yields a method that converges with the spectral accuracy
+for finite mesh size and time step.  We use a linear hyperbolic equation
+with discontinuous and random coefficient, and the Liouville equation with
+discontinuous and random potential, to illustrate our idea, with both one
+and second order spatial discretizations. Spectral convergence is established 
+for the first equation, and numerical examples for both equations show the
+desired accuracy of the method.
+
+Secondly, we study the stochastic Galerkin approximation for the linear transport equation with random inputs and diffusive scaling. We first establish uniform (in the Knudsen number) stability results in the random space for the
+transport equation with uncertain scattering coefficients, and then prove the uniform spectral convergence (and consequently the sharp stochastic Asymptotic-Preserving property)  of the stochastic Galerkin method. A micro-macro decomposition based fully discrete scheme is adopted for the problem and proved to have a uniform stability. Numerical experiments are conducted to demonstrate the stability and asymptotic properties of the method.
+
+Thirdly, we propose a new time splitting Fourier spectral method for the semi-classical Schr\"{o}dinger equation with vector potentials. 
+Compared with the results in \citen{SemiJZ}, our method achieves spectral accuracy in space by interpolating the Fourier series via the 
+NonUniform Fast Fourier Transform (NUFFT) algorithm in the convection step.
+The NUFFT algorithm helps maintain high spatial accuracy of Fourier method, and at the same time improve the efficiency from $O(N^{2})$ (of direct computation) to $O(N\log N)$ operations, where $N$ is the total number of grid points.
+The kinetic step and potential step are solved by analytical solution with pseudo-spectral approximation,  and, 
+therefore, we obtain spectral accuracy in space for the whole method.  
+We prove that the method is unconditionally stable, and we show improved error estimates for both the wave function and physical observables, which agree with the results in \citen{BaoJM} for vanishing potential cases and are superior to those in  \citen{SemiJZ}.
+Extensive one and two dimensional numerical studies are presented to verify the properties of the proposed method, and simulations of 3D problems are demonstrated to show its potential for  future practical applications.
+
+Finally, we investigate numerical approximations of  the scalar conservation law with the Caputo derivative, which introduces the memory effect.  We construct the first order and the second order explicit upwind schemes for such equations, which are shown to be conditionally $\ell^1$ contracting and TVD. However, the Caputo derivative leads to the modified CFL-type stability condition, $ (\Delta t)^{\alpha} = O(\Delta x)$, where $\alpha \in (0,1]$ is the fractional exponent in the derivative. When $\alpha$ is small, such strong constraint makes the numerical implementation extremely impractical. We have then proposed the implicit upwind scheme to overcome this issue, which is proved to be unconditionally $\ell^1$ contracting and TVD. Various numerical tests are presented to validate the properties of the methods and provide more numerical evidence in interpreting  the memory effect in conservation laws. 
+
+
+
+\englishkeywords{\large hyperbolic equation, random coefficient, potential barrier, stochastic Galerkin method, polynomial chaos, linear transport equation, random inputs, diffusion limit, uncertainty quantification, asymptotic-preserving scheme, semi-classical Schr\"{o}dinger equation, vector potential, semi-Lagrangian time splitting method, nonuniform FFT}
+\end{englishabstract}
+

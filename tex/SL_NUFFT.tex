@@ -1,0 +1,1255 @@
+% !TeX root = ../thesis.tex
+
+% \documentclass[preprint,3p]{elsarticle} 
+% %\journal{J. Comput. Phys.}
+
+% \usepackage{geometry}                		% See geometry.pdf to learn the layout options. There are lots.                		% ... or a4paper or a5paper or ... 
+% \usepackage{graphicx}				% Use pdf, png, jpg, or eps§ with pdflatex; use eps in DVI mode
+% \usepackage{wrapfig}
+% \usepackage{amsmath,amssymb,amsthm}							% TeX will automatically convert eps --> pdf in pdflatex
+% \usepackage{multirow}
+% \usepackage{tabularx,epsfig,color,caption}
+% \usepackage{algorithm,algorithmic,mathtools,bm}
+% \usepackage{epstopdf}
+
+%%%%%%%%%%%%%%%%% author macros %%%%w%%%%%%%%%
+% \renewcommand{\theequation}{\arabic{section}.\arabic{equation}}  % numbering the equation by section
+% \newtheorem{theorem}{THEOREM}[section]
+% \newtheorem{remark}{Remark}[section]
+% \newtheorem{lemma}{LEMMA}[section]
+% \newtheorem{exmp}{Example}[section]
+% \newcommand*\note[1]{{\color{red}{(NOTE: #1)}}}
+% \newcommand*\todo[1]{{\color{red}{(TODO: #1)}}}
+
+\newcommand{\be}{\begin{equation}}
+\newcommand{\ee}{\end{equation}}
+\newcommand{\ba}{\begin{array}}
+\newcommand{\ea}{\end{array}}
+\newcommand{\bea}{\begin{eqnarray}}
+\newcommand{\eea}{\end{eqnarray}}
+\newcommand{\beas}{\begin{eqnarray*}}
+\newcommand{\eeas}{\end{eqnarray*}}
+
+
+\newcommand\bR{\mathbb{R}}
+\renewcommand{\bx}{{\bf x}}
+\renewcommand{\by}{{\bf y}}
+\renewcommand{\bk}{{\bf k}}
+\renewcommand{\bz}{{\bf 0}}
+
+
+
+% \begin{document}
+
+
+% \begin{frontmatter}
+
+
+% \title{An improved semi-Lagrangian time splitting spectral method for the semi-classical Schr\"odinger equation with vector potentials using NUFFT}
+% \author[sjit]{Zheng MA}
+% \ead{mayuyu@sjtu.edu.cn}
+
+% \address[sjit]{Department of Mathematics,
+% Shanghai Jiao Tong University,
+% 800 Dongchuan RD, Shanghai, 200240, China}
+
+% \author[irmar,wpi]{Yong ZHANG\corref{5}}
+% \ead{yong.zhang@univ-rennes1.fr}
+% \address[irmar]{Universit\'e de Rennes 1, IRMAR, Campus de Beaulieu, 35042 Rennes Cedex, France}
+% \address[wpi]{Wolfgang Pauli Institute c/o Fak. Mathematik, University Wien, Oskar-Morgenstern-Platz 1, 1090 Vienna, Austria}
+
+% \author[duke]{Zhennan ZHOU}
+% \ead{zhennan@math.duke.edu}
+% \address[duke]{Departments of Mathematics, Duke University, Box 90320, Durham, NC, 27708, USA}
+
+% \cortext[5]{Corresponding author.}
+
+
+
+
+% %%%%% Begin Abstract %%%%%%%%%%%
+% \begin{abstract}
+% In this paper, we propose a new time splitting Fourier spectral method for the semi-classical Schr\"{o}dinger equation with vector potentials. 
+% Compared with the results in \citen{SemiJZ}, our method achieves spectral accuracy in space by interpolating the Fourier series via the 
+% NonUniform Fast Fourier Transform (NUFFT) algorithm in the convection step.
+% The NUFFT algorithm helps maintain high spatial accuracy of Fourier method, and at the same time improve the efficiency from $O(N^{2})$ (of direct computation) to $O(N\log N)$ operations, where $N$ is the total number of grid points.
+% The kinetic step and potential step are solved by analytical solution with pseudo-spectral approximation,  and, 
+% therefore, we obtain spectral accuracy in space for the whole method.  
+% We prove that the method is unconditionally stable, and we show improved error estimates for both the wave function and physical observables, which agree with the results in \citen{BaoJM} for vanishing potential cases and are superior to those in  \citen{SemiJZ}.
+% Extensive one and two dimensional numerical studies are presented to verify the properties of the proposed method, and simulations of 3D problems are demonstrated to show its potential for  future practical applications.
+
+% \end{abstract}
+
+
+
+% \begin{keyword}
+% semi-classical Schr\"{o}dinger equation, vector potential, semi-Lagrangian time splitting method, nonuniform FFT
+% \end{keyword}
+
+
+% \end{frontmatter}
+
+\chapter{使用NUFFT的半拉格朗日时间算子分裂法在具有向量势的薛定谔方程的应用}
+
+%------------------------------------------------------
+%\section{简介}
+%\subsection{Background and outline}
+
+% Quantum effects play a significant role in many scientific and engineering areas, such as theoretical chemistry, solid-state mechanics and quantum optics, and the mathematical analysis and numerical simulation of Schr\"{o}dinger equations 
+% are of fundamental importance. This type of equations form a canonical class of dispersive PDEs, i.e., equations where waves of different wavelengths propagate at different phase velocities. Whenever the magnetic field is considered,  we need to incorporate the vector potentials in the  Schr\"{o}dinger equation.
+
+量子效应在许多科学和工程领域中发挥重要作用，例如理论化学，固态力学和量子光学。而对于薛定谔方程的数学分析和数值模拟具有根本的重要性。这种类型的方程形成了一类的色散偏微分方程，即不同波长的波在不同相速度下传播的方程。而当考虑磁场时，我们需要将向量势函数引入到薛定谔方程中。
+
+% In this paper, we consider the semi-classical Schr\"odinger equation with vector potentials, which has the form
+在本章中，我们考虑具有向量势函数的半经典薛定谔方程，其具有形式
+\begin{equation} \label{eq:main1}
+i\varepsilon\partial_{t}u^{\varepsilon}=\frac{1}{2}\left(-i\varepsilon\nabla_x-\mathbf{A}(x)\right)^{2}u^{\varepsilon}+V(x)u^{\varepsilon},\quad t\in\mathbb{R}^{+},\quad x\in\mathbb{R}^{3},
+\end{equation}
+\begin{equation}
+u^{\varepsilon}({x},0)=u_{0}({x}),\quad x \in\mathbb{R}^{3}\label{eq:initial cond},
+\end{equation}
+% where $u^{\varepsilon}({x},t)$ is the complex-valued
+% wave function, $V({x})\in\mathbb{R}$  is the scalar potential and $\mathbf{A}({x})\in\mathbb{R}^{3}$
+% is the vector potential. The scalar potential  and the vector
+% potential  are introduced to mathematically describe the electromagnetic field, i.e., the electric
+% field $\mathbf{E}({x})\in\mathbb{R}^{3}$ and the magnetic
+% field $\mathbf{B}({x})\in\mathbb{R}^{3}$ given as follows
+其中$u^{\varepsilon}({x},t)$是复值波函数，$V({x})\in\mathbb{R}$是标量势函数，$\mathbf{A}({x})\in\mathbb{R}^{3}$是向量势函数。数学上我们用标量势和向量势来描述电磁场，即电场$\mathbf{E}({x})\in\mathbb{R}^{3}$和磁场$\mathbf{B}({x})\in\mathbb{R}^{3}$如下
+\begin{equation}
+\mathbf{E}=-\nabla V(x),\qquad\mathbf{B}=\nabla\times\mathbf{A}\left( x \right).
+\end{equation}
+
+
+% The Schr\"{o}dinger equation \eqref{eq:main1}
+% above can be derived from the equation in the absence of the vector potential
+% by local gauge transformation (see \citen{QO}). The quantum dynamics in the presence of the external
+% electromagnetic field results in many far-reaching consequences in
+% quantum mechanics, such as Landau levels, Zeeman effect and superconductivity.
+% In the aspect of analysis, the Hamiltonian has different features in spectral and scattering properties (see
+% \citen{magstudy}). Numerically, it gives new challenges as well,
+% especially in the semi-classical regime. The presence of the vector
+% potential introduces a convection term in the Schr\"{o}dinger
+% equation and in the meanwhile effectively modifies the scalar potential
+% (see \citen{SemiJZ}).
+薛定谔方程\eqref{eq:main1}可以由不带向量势的方程通过局部规范变换（参见\citen{QO}）导出。外部电磁场的存在的量子力学演化会导致许多深远的结果，例如朗道能级、塞曼效应和超导性。
+在分析方面，哈密顿算子在光谱和散射性质上具有不同的特征（见\citen{magstudy}）。数值上，它也带来了新的挑战，特别是在半经典格式中。向量势函数的存在使得薛定谔方程中引入对流项
+并且同时标量势函数也产生了一定影响（参见\citen{SemiJZ}）。
+
+
+% In fact, one can simplify the potential description by imposing one
+% more condition, namely, specifying the gauge. The electric field $\mathbf{E}(x)\in\mathbb{R}^{3}$
+% and magnetic field $\mathbf{B}(x)\in\mathbb{R}^{3}$ stay invariant
+% in different gauges. One natural choice is, $\nabla_{x}\cdot\mathbf{A}=0$, which is the so-called
+% Coulomb gauge. In this gauge, the vector potential and the canonical
+% momentum operator commute, $[\mathbf{A},\,-i\varepsilon\nabla_x]=0$,
+% so that the modified ``kinetic'' part of the Schr$\ddot{\textrm{o}}$dinger
+% equation \eqref{eq:main1} can be simplified  as follows
+事实上，可以通过额外添加一个条件来简化势函数，即给出一个指定的规范。电场$\mathbf{E}(x)\in\mathbb{R}^{3}$
+和磁场$\mathbf{B}(x)\in\mathbb{R}^{3}$具有所谓的规范不变性。一个自然的选择是$\nabla_{x}\cdot\mathbf{A}=0$，这就是所谓的库仑规范。在这个规范中，矢量势和正则动量互为对易，$[\mathbf{A},\,-i\varepsilon\nabla_x]=0$
+使得修改后的薛定谔方程\eqref{eq:main1}的动能（``kinetic''）部分可以简化为如下
+\begin{equation}\label{eq:reform}
+\frac{1}{2}(-i\varepsilon\nabla_{x}-\mathbf{A})^{2}u^{\varepsilon}=-\frac{\varepsilon^{2}}{2}\Delta_{x}u^{\varepsilon}+i\varepsilon\mathbf{A}\cdot\nabla_{x}u^{\varepsilon}+\frac{1}{2}|\mathbf{A}|^{2}u^{\varepsilon}.
+\end{equation}
+
+
+% In the Schr$\ddot{\textrm{o}}$dinger equation, the wave function acts as an auxiliary quantity used to compute macroscopic physical quantities (physical observables)
+% such as the position density
+在薛定谔方程中，波函数作为辅助量用于计算宏观物理量（物理可观测量），例如位置密度
+\begin{equation}
+n(x,t)=|u^{\varepsilon}(x,t)|^{2},
+\end{equation}
+和修正的电流密度
+\begin{equation}
+\mathbf{J}(x,t)=\frac{1}{2}\left(\overline{u^{\varepsilon}}\left(-i\varepsilon\nabla_{x}-{\mathbf A}\right)u^{\varepsilon}-
+u^{\varepsilon}\left(-i\varepsilon\nabla_{x}-{\mathbf A}\right)\overline{u^{\varepsilon}}\right),
+\end{equation}
+% where $\bar{f}$ denotes the complex conjugate of $f$. Actually, we have the following mass conservation equation
+其中$\bar{f}$表示$f$的复共轭。实际上，我们有以下质量守恒方程
+\begin{equation}
+\frac{\partial}{\partial t}n+\nabla_{x}\cdot\mathbf{J}=0.
+\end{equation}
+% We remark that $n$ and $\mathbf{J}$ are gauge invariant quantities. Another two important physical quantities are the {\it mass}
+我们指出$n$和$\mathbf{J}$都是规范不变量。另外两个重要的物理量是{\it 质量}
+\begin{equation}
+m(t):=\|u^{\varepsilon}(x,t)\|^2_{L^2}=\int_{\mathbb R^3} n(t,x) dx,
+\end{equation}
+和{\it 能量}
+\begin{equation}
+\mathcal E(t):=\frac{1}{2}\|(-i\varepsilon\nabla-\mathbf{A})u^{\varepsilon}\|_{L^2}^2+\langle u^{\varepsilon},Vu^{\varepsilon}\rangle,
+\end{equation}
+% where $\langle f,g\rangle \equiv\int_{\mathbb{R}^d}f(x)\overline{ g(x)}\,dx$ is the standard inner product. For $u^\varepsilon \in C(\mathbb{R}_t;L^2(\mathbb{R}^d) \cap \mathcal S (\mathbb R^d))$, these quantities are conserved through dynamics. We refer the readers to appendixes for detailed proofs.
+其中$\langle f,g\rangle \equiv\int_{\mathbb{R}^d}f(x)\overline{ g(x)}\,dx$是标准的内积。对于$u^\varepsilon \in C(\mathbb{R}_t;L^2(\mathbb{R}^d) \cap \mathcal S (\mathbb R^d))$，这些量在动力学演化中是守恒的。我们把详细的证明放在本章的附录\ref{app_nufft}中。
+
+
+% In the semi-classical regime, namely $\varepsilon \ll 1$, the wave function  $u^{\varepsilon}$ is highly oscillatory both in space and time on the scale
+% $O(\varepsilon)$, therefore it does not converge in the strong sense as $\varepsilon\rightarrow0$. When $\varepsilon\ll1$, several approximate methods
+% other than directly solving the Schr\"{o}dinger equation have been proposed, such as the level
+% set method and the moment closure method based on the WKB analysis and the Wigner transform, see, for example, \citen{high_freq_waves,level_set,multi-phase,reviewsemiclassical}.
+% The Gaussian beam method (or the Gaussian wave packet approach) is
+% another important one, which allows accurate computation around caustics and captures phase information (see, for example, \citen{Ejheller,Popov,Gaussian_propagation,EGB}) with $O(\varepsilon^{1/2})$ model error.
+% To improve the approximation accuracy, higher order Gaussian beam methods were introduced with an error $C_{k}(T)\varepsilon^{k/2}$
+% (see \citen{HGBT,HEGB}). However, it has been shown in \citen{ErrorestiGB,HagedornV}
+% that, for fixed $\varepsilon$, higher order Gaussian beam methods may not be a practical way to reduce the error. 
+% Whereas, the Hagedorn wave packets, studied by Hagedorn \citen{Hagedornraising}, analyzed and implemented as a computational tool in \citen{Hagedornraising,Newsplitting,HagedornV}, 
+% can effectively reduce the error for all $\varepsilon\in(0,1]$. In \citen{HagedornV}, Zhou has extended this method to the vector potential case and provided a rigorous proof for the higher order convergence with the Galerkin approximation. 
+% Recently, Russo and Smereka in \citen{GBTrans,GBTrans2} proposed a new approach based on the so-called Gaussian Wave packet transform, which is another worthy alternative.
+
+在半经典格式下，即$\varepsilon \ll 1$时，波函数$u^{\varepsilon}$在空间和时间上都是高度振荡的，振荡的尺度为$O(\varepsilon)$。因此当$\varepsilon\rightarrow0$时，它在强意义下并不收敛。当$\varepsilon\ll 1$时，相比于直接求解薛定谔方程，更多的是一些近似方法，如水平集方法和基于WKB分析和Wigner变换的矩封闭方法，参见\citen{high_freq_waves,level_set,multi-phase,reviewsemiclassical}。
+高斯波束法（或高斯波包法）是另一类重要的方法，它允许精确计算焦散和捕获相位信息（参见例如\citen{Ejheller,Popov,Gaussian_propagation,EGB}），这种模型误差为$O(\varepsilon^{1/2})$。
+为了提高近似精度，人们引入了高阶高斯波束方法，其具有误差$C_{k}(T)\varepsilon^{k/2}$
+（见\citen{HGBT,HEGB}）。然而，在\citen{ErrorestiGB,HagedornV}中已经证明
+对于固定的$\varepsilon$，更高阶的高斯波束方法可能不是减少误差的实用方法。然而，Hagedorn在\citen{Hagedornraising}中提出，在\citen{Hagedornraising,Newsplitting,HagedornV}中分析和实现的Hagedorn波包
+可以有效地减少所有$\varepsilon\in(0,1]$中的误差。在\citen{HagedornV}中，Zhou已经将该方法扩展到向量势函数，并为伽辽金近似的高阶收敛提供了严格的证明。
+最近，Russo和Smereka在文献\citen{GBTrans,GBTrans2}中提出了一种基于所谓的高斯波包变换的新方法，这是另一个值得选择的方法。
+
+% Numerically, if one wants to directly simulate the Schr\"{o}dinger equation \eqref{eq:main1},
+% the oscillatory nature of the wave function gives rise to significant computational
+% burdens. The computation of physical observables, like $n(x,t)$ and $\mathbf{J}(x,t)$, faces the same
+% challenges. To our best knowledge, one of the best methods is the time splitting spectral method, introduced by Bao, Jin and Markowich
+% in \citen{BaoJM,BaoJM2,reviewsemiclassical}, where the meshing strategy $\Delta t=O(\varepsilon)$ and $\Delta x=O(\varepsilon)$ is sufficient to guarantee an accurate approximation of the wave function.
+% To compute correct physical observables, the time step can be relaxed to $O(1)$.
+
+在数值上，如果想直接模拟薛定谔方程\eqref{eq:main1}，波函数的振荡性质会使计算开销十分巨大。对于物理可观测量的计算，如$n(x,t)$和$\mathbf{J}(x,t)$，
+也是如此。据我们所知，最好的方法之一是时间分裂谱方法，由Bao，Jin和Markowich在\citen{BaoJM,BaoJM2,reviewsemiclassical}中提出，其中网格策略$\Delta t=O(\varepsilon)$和$\Delta x=O(\varepsilon)$就足以保证波函数的准确近似。而为了计算正确的物理可观察量，时间步长可以放松到$O(1)$。
+
+% Due to the presence of the vector potential, compared with the classical case, there are two major changes in \eqref{eq:reform}:  a modified scalar potential and a new convection term. 
+% In order to design an unconditional stable scheme, a semi-Lagrangian time splitting method was introduced by Jin and Zhou \citen{SemiJZ}, where the meshing strategy $\Delta t=O(\varepsilon)$ and $\Delta x=O(\varepsilon)$ is sufficient to guarantee an accurate approximation 
+% of the wave function. Similarly, one can use $\varepsilon$ independent time steps to capture correct physical observables. 
+% In the convection step, a polynomial interpolation technique was analyzed and implemented in \citen{SemiJZ}, where the spatial accuracy was sacrificed for efficiency consideration.
+% In fact, a spectral interpolation can be applied instead to improve spatial accuracy, unfortunately, it would increase the computational complexity from $O(N)$ (polynomial interpolation) to $O(N^2)$ (direct Fourier series summation), 
+% where $N$ is the number of grid points. The primary issue is that the standard inverse FFT no longer applies since the evaluation points are not necessarily uniformly spaced.
+% Hence, a balance between efficiency and accuracy is desired for the semi-Lagrangian method. 
+
+由于向量势函数的存在，与经典情况相比，在\eqref{eq:reform}中存在两个主要变化：修正的标量势和新的对流项。
+为了设计一个无条件稳定的格式，Jin和Zhou在\citen{SemiJZ}中引入了半拉格朗日时间分裂方法（semi-Lagrangian time splitting method），其中网格划分策略$\Delta t=O(\varepsilon)$ 和$\Delta x=O(\varepsilon)$足以保证准确的近似的波函数。类似地，可以使用$\varepsilon$时间步长来捕获正确的物理可观察量。在对流步骤中，在\citen{SemiJZ}中分析和实现了多项式插值技术，其中为了效率考虑牺牲了空间精度。
+事实上，可以代替地应用谱插值以改善空间精度，不幸的是，它将使计算复杂度从$O(N)$（多项式插值）增加到$O(N^2)$（直接傅里叶级数求和）其中$N$是网格点的数量。这里主要问题是取样点不一定均匀分布，标准逆FFT不再适用，因此，半拉格朗日方法需要效率和精度之间的平衡。
+
+% Thanks to the nonuniform Fast  Fourier transform (NUFFT), (see, for example, \citen{nufft2,nufft6}), the problem can be solved idealy.
+% This is the major motivation of our work. The nonuniform Fourier transform arises in a variety of application areas, from medical imaging to radio astronomy to the numerical solution of partial differential equations. When the sampling is uniform and the Fourier transform is desired at equispaced frequencies, the classical fast Fourier transform (FFT) has played a fundamental role in computation which requires only $O(N\log N)$ operations to compute $N$ Fourier modes from $N$ points rather than $O(N^2)$ operations. However, when the data is not sampled on an evenly partitioned mesh in either the ``physical'' or ``frequency" domain, unfortunately, the FFT does not apply. Over the last few years, a number of algorithms have been developed to overcome this limitation and are often referred to as nonuniform FFT's (NUFFT's).
+
+由于非均匀快速傅立叶变换（NUFFT）（参见例如\citen{nufft2,nufft6}），可以是该问题得到理想的解决。
+这是我们工作的主要出发点。非均匀傅里叶变换在各种应用领域中产生，从医学成像到射电天文学到偏微分方程的数值解。当采样是均匀的并且在等间隔频率处需要傅立叶变换时，经典快速傅里叶变换（FFT）在计算中起到重要作用，其仅需要$O(N\log N)$复杂度来计算$N$个傅里叶系数而不是$O(N^2)$的复杂度。然而，当数据不是在“物理”或“频率”域中的均匀分割的网格上进行采样时，不幸的是，FFT并不适用。在过去几年中，已经开发了许多算法来克服了这种限制，通常被称为非均匀FFT（NUFFT）。
+
+
+
+% In this paper, we incorporate the NUFFT algorithm into the time splitting semi-Lagrangian method, and the computational complexity is $O(N \log N)$.
+% The new method is proved to be unconditionally stable. Unlike the polynomial case, where special care is needed for the interpolation stencil, 
+% the interpolation is now done by a global spectral approximation. When time and space oscillations are resolved, namely, $\Delta x =O(\varepsilon)$ and $\Delta t = O(\varepsilon)$, 
+% we prove that our method is spectrally accurate in space and first order accurate in time.  We also showed, in the framework of Wigner transform, that $\varepsilon$-independent time steps are allowed to compute the correct physical observables.
+
+在本章中，我们将NUFFT算法结合到时间分裂半拉格朗日方法中，计算复杂度为$O(N \log N)$。可以证明新方法是无条件稳定的。与多项式插值的情况不同（插值模板需要特别处理），
+现在通过全局谱近似来进行插值。当需要还原时间和空间振荡时，即$\Delta x = O(\varepsilon)$和$\Delta t = O(\varepsilon)$，我们证明我们的方法在空间具有谱精度和一阶时间精度。我们还在Wigner变换的框架中证明，允许不依赖于$\varepsilon$时间步长来计算正确的物理可观察量。
+
+% Extensive numerical experiments were carried out to validate our methods. The temporal error can easily be improved with a high order splitting scheme. 
+% In practice, the Strang splitting was applied in our simulation.
+% In the one dimensional case, we have verified that the method converges spectrally in space and second order in time. 
+% We also show that when computing the physical observables, there is no need to resolve the time oscillations.  Numerical experiments in two and three dimensions are presented.
+
+我们进行了大量的数值实验来验证我们的方法。通过高阶分裂方案可以容易地提高时间方向的精度。在数值中，我们使用Strang算子分裂。在一维情况下，我们已经验证了该方法在时间上二阶收敛，在空间上谱收敛。
+我们还表明，当计算物理可观测量时，没有必要还原时间振荡。我们同时给出了二维和三维数值实验。
+
+% The rest of the paper is organized in the following way. In Section 2, we present a detailed construction of the numerical method as well as a brief review of the NUFFT algorithm. Rigorous stability analysis and error estimates of the wave function are provided in Section 3, where we also analyzed the meshing strategy when computing the physical observables only. 
+% In section 4, we present various numerical tests to verify the properties of our method. We conclude in the last section with some comments and future directions. 
+
+本章的其余部分按以下方式组织。在4.1节中，我们提出了数值方法的详细结构以及对NUFFT算法的简要回顾。 在4.2节中提供了波函数的严格稳定性分析和误差估计，其中我们还分析了计算物理可观测量时网格划分策略。
+在4.3节，我们提出了各种数值测试来验证我们的方法的性质。我们在最后一节总结一些评论和未来的方向。
+
+
+
+
+
+%% == Section II ===
+%------------------------------------------------------
+
+
+%------------------------------------------------------
+\section{数值方法}
+
+\subsection{时间算子分裂与谱逼近}
+
+% In this section, we shall adapt the time splitting spectral method introduced in \citen{BaoJM,SemiJZ}.
+% For simplicity, we focus on the one dimensional problem with periodic boundary condition.
+% The extension to multidimensional cases is straightforward by tensor product. 
+% Here, we only present a first order time splitting scheme and the extension to higher order scheme has been described in \citen{SemiJZ}.
+
+在本节中，我们将应用在\citen{BaoJM,SemiJZ}中引入的时间分裂谱方法。为了简单起见，我们考虑周期边界条件的一维问题。对多维情况的可以通过张量积直接推广。
+这里，我们只描述一阶时间分裂格式，在\citen{SemiJZ}中描述了对高阶格式的推广。
+
+考虑在计算区域$[a,b]$上的均匀网格$x_j = a+ j \Delta x,\,j =0,\ldots,N-1$, 其中$\Delta x = (b-a)/N$，$N$正的偶数。时间步长$\Delta t$，定义$t_n=n\Delta t$，$U^{n} = (U_{0}^{n}, \ldots, U_{N-1}^{n})^{T}$的分量$U_{j}^{n}$为$u^{\varepsilon}(x_{j},t_{n})$的数值近似，$V_{j}$是$V(x_{j})$的数值近似。
+
+% We consider the one dimensional Schr\"odinger equation, which is reminiscent of equation (\ref{eq:main1}) with the Coulomb gauge,
+我们考虑一维薛定谔方程，即库仑规范下的(\ref{eq:main1})，
+\begin{equation}\label{main-1d}
+    i\varepsilon\partial_t u^\varepsilon=-\frac{\varepsilon^2}{2}\Delta u^\varepsilon+i\varepsilon\mathbf{A}\cdot\nabla u^\varepsilon+\frac{1}{2}|\mathbf{A}|^2 u^\varepsilon+Vu^\varepsilon,
+    \quad a<x<b, \quad t>0,
+\end{equation}
+和周期边界条件
+\begin{equation}
+    \quad u^\varepsilon(a,t)=u^\varepsilon(b,t),\quad u^\varepsilon_x(a,t)=u^\varepsilon_x(b,t),
+\end{equation}
+及初值
+\bea
+u^\varepsilon(x,0)=u^\varepsilon_0(x).
+\eea
+% Note that, in one dimensional cases, $\mathbf A$ is a scalar function and  the potential gauge is not a well defined concept, but the numerical methods designed for equation \eqref{main-1d} can naturally be extended to the multidimensional cases. In the framework of the time splitting method, to evolve \eqref{main-1d} from $t_n$ to $t_{n+1}$, 
+% we can first solve the {Schr\"{o}dinger} equation with the kinetic part only
+注意，在一维情况下，$\mathbf{A}$是一个标量函数，这时势函数的规范计没有明确定义，但方程\eqref{main-1d}数值方法可以推广到多维情况。在时间算子分裂法的框架中，要将\eqref{main-1d}从$t_n$演变为$t_{n + 1}$，我们可以先街薛定谔方程的动能算子部分，
+\begin{equation}\label{kin-1d}
+    i\varepsilon\partial_t u^\varepsilon=-\frac{\varepsilon^2}{2}\Delta u^\varepsilon, \quad t\in [t_n,t_{n+1}],
+\end{equation}
+接着解势函数的部分
+\begin{equation}\label{pot-1d}
+    i\varepsilon\partial_t u^\varepsilon=\frac{1}{2}|\mathbf{A}|^2 u^\varepsilon+Vu^\varepsilon,\quad t\in[t_n,t_{n+1}],
+\end{equation}
+最后解对流的部分
+\begin{equation}\label{convection}
+    \partial_t u^\varepsilon=\mathbf{A}\cdot\nabla u^\varepsilon,\quad t\in[t_n,t_{n+1}].
+\end{equation}
+% To solve the above equations numerically, we first introduce a function space $S_N$ as follows
+为了数值解上面的方程，我们首先引入如下函数空间$S_N$
+\bea
+S_N= {\rm span}\{e^{i \mu_k (x-a)},\;\mu_k = (2\pi k )/(b-a) \quad k = -N/2, \ldots, N/2-1 \}.
+\eea
+设${\rm II_N}: S_{\rm p}:=\{u(x) | u \in C^1([a,b]), u(a) =u(b), u'(a)=u'(b)\} \rightarrow S_N$为标准的投影算子\citen{ST}, 即 
+\bea
+\left({\rm II_N}\,u\right)(x)=\sum_{k=-N/2}^{N/2-1}\widetilde{u}_k \, e^{i\mu_k\,(x-a)},\quad x\in[a,b],\qquad
+\forall\; u(x)\in S_{\rm p},
+\eea
+以及
+\bea\label{fr:coeff}
+\widetilde{u}_k = \frac{1}{b-a}\int_a^b u(x)\,e^{-i\mu_k\,(x-a)}dx,\qquad k=-N/2,\ldots,N/2-1.
+\eea
+% To compute the Fourier coefficient $\widetilde{u}_{k}$,  we approximate the integral in \eqref{fr:coeff} by a numerical quadrature, i.e., the trapezoidal rule, 
+% on the uniform grid points, and the resulting summation is implemented with FFT efficiently. 
+% Equivalently, this numerical approximation allows us to define an interpolation of $u(x)$ on the grid points as 
+为了计算傅立叶系数$\widetilde{u}_{k}$，我们用数值积分（梯形法）在均匀网格点上来近似\eqref{fr:coeff}中的积分，并且所得的求和是由FFT实现。等价地，这个数值近似允许我们在网格点上定义$u(x)$的插值，如下
+\bea\label{interp}
+u_I(x)=\sum_{k=-N/2}^{N/2-1}\, \hat{u}_k \,e^{i\mu_k(x-a)},  \quad x \in [a,b],
+\eea
+其中
+\bea
+\hat{u}_k=\frac{1}{N}\sum_{j=0}^{N-1}U_j\,e^{-i\mu_{k}(x_j-a)} = \frac{1}{N}\sum_{j=0}^{N-1} U_{j} e^{-i\frac{2\pi   j k}{N}} , \quad  k= -N/2, \ldots, N/2-1.
+\eea
+% Numerically, we can solve the free {Schr\"{o}dinger} equation \eqref{kin-1d} analytically in the Fourier space
+数值上，我们可以在傅立叶空间精确的得到\eqref{kin-1d}的解
+\begin{equation}\label{kin-1d-numeric}
+    U^*_j=\sum^{N/2-1}_{k=-N/2}e^{-i \frac{\Delta t}{2} \varepsilon \mu^2_k}\, \hat{u}^n_k\; e^{i\mu_k(x_j-a)},
+\end{equation}
+势能的方程由可以在物理空间得到精确解
+\begin{equation}\label{pot-1d-numeric}
+    U^{**}_j=e^{-i(\frac{1}{2}|\mathbf{A}|^2 u^{*}_{j}+V_{j}) \Delta t/\varepsilon}\,U^*_j.
+\end{equation}
+
+% Generally speaking, for arbitrary vector potential $\mathbf{A}(x)$, it is not possible to solve the convection equation \eqref{convection} analytically.  Although many numerical methods are available for this equation, most of the prevailing ones have the CFL constraints which prevent large time steps compared with spatial mesh sizes. However, to capture accurate physical observables by solving the oscillatory wave function with unresolved time steps, it is necessary to apply an unconditionally stable method. 
+一般来说，对于任意向量势函数$\mathbf{A}(x)$，不可能得到对流方程\eqref{convection}的精确解。 虽然许多数值方法可用于解该方程，但是大多数主要的方法具有CFL条件，使得时间步长不能选的很大。为了用较大的时间步长来得到物理观测量，有必要应用无条件稳定的方法。
+
+% To solve the convection step numerically with improved stability condition, a semi-Lagrangian method with  polynomial  interpolations has been proposed in \citen{SemiJZ}. 
+% The semi-Lagrangian method consists of backtracing along the characteristic and interpolation. To be precise, we solve the convection equation with periodic boundary conditions
+为了用改进的稳定性条件数值地解对流方程，在\citen{SemiJZ}中提出了具有多项式插值的半拉格朗日方法。半拉格朗日方法包括沿着特性线回溯和插值。准确地说，我们用周期边界条件求解对流方程
+\begin{equation}\label{conv-1d}
+    \partial_t u^\varepsilon-\mathbf{A}\cdot \nabla u^\varepsilon=0,\quad t\in[t_n,t_{n+1}].
+\end{equation}
+对应的特征线方程为
+\begin{equation}\label{ODE}
+    \frac{dx(t)}{dt}=-\mathbf{A}(x(t)),\quad x(t_{n+1})=x_j.
+\end{equation}
+
+% We name the solution $x(t_n) = x_j^0$, which is obtained numerically by solving the ODE  \eqref{ODE},
+% as shifted target points hereafter. Along the characteristic line, we have  $u^{\varepsilon}(x_{j},t_{n+1})=  u^{\varepsilon}(x^0_j,t_{n})$.
+% However, since the shifted target points are not necessarily grid points, an interpolation is needed to approximate $u^{\varepsilon}(x_j^0,t_{n})$. 
+% We can employ either global spectral interpolation, e.g., Fourier pseudo-spectral interpolation,  
+% or local polynomial interpolation, e.g., $M$-th order Lagrange polynomial interpolation  \citen{SemiJZ}.
+我们令常微分方程\eqref{ODE}的数值解$x(t_n) = x_j^0$。沿着特性线，我们有$u^{\varepsilon}(x_{j},t_{n+1})=  u^{\varepsilon}(x^0_j,t_{n})$。然而，由于经移位的目标点不一定是网格点，因此需要插值以近似估计$u^{\varepsilon}(x_j^0,t_{n})$。我们可以采用全局谱插值，例如傅里叶伪谱差值，或局部多项式插值，例如$M$阶拉格朗日多项式插值\citen{SemiJZ}。
+
+% When local polynomial interpolation applies, for each shifted target point $x_j^0$, one needs to construct a polynomial interpolant from its adjacent grid points. 
+% Take the $M$-th order Lagrange polynomial interpolation for example, for each $x_j^0$,  one chooses $M$ adjacent grid points to construct Lagrange polynomial interpolant with $O(\Delta x^M)$ errors.
+% The total cost of the local polynomial interpolation is $O(N)$  for each step. 
+当应用局部多项式插值时，对于每个移位的目标点$x_j^0$，需要从其相邻网格点构建多项式插值。以$M$阶的拉格朗日多项式插值为例，对于每个$x_j^0$，选择$M$个相邻的网格点来构造具有$O(\Delta x^M)$误差的拉格朗日多项式插值。局部多项式插值的总计算量每个时间步为$O(N)$。
+
+% While in the global spectral interpolation, we first construct a spectral interpolation on grid points, 
+% and then evaluate the interpolation function at shifted target points. For the Fourier spectral interpolation, all the Fourier coefficients are computed within $O(N\log N)$ arithmetic operation with FFT.
+% It is worthwhile to point out that FFT does not apply in evaluations simply because $\{x^0_j\}$ are not necessarily the uniformly distributed grid points. 
+% Direct evaluation of the finite Fourier series for each target point $x_j^0$ requires $N$ operations. 
+% Therefore, the total evaluation process cost is $O(N^2)$ and it is quite time consuming, especially in higher dimensions.
+而在全局谱插值中，我们首先在网格点上构建谱插值，然后算出在移位的目标点处的插值函数。对于傅立叶谱插值，所有傅里叶系数在用FFT的计算量为$O(N\log N)$。值得指出的是，FFT不能用于计算在移位的目标点处的差值函数，因为$\{x^0_j\}$不一定是均匀分布的网格点。对每个目标点的有限傅立叶级数的直接估计$x_j^0$ 需要$O(N)$的计算量。
+因此，总评估过程成本是$O(N^2)$，并且它是相当耗时的，特别是在高维时。
+
+% Compared with local polynomial interpolation, the Fourier interpolation is spectrally accurate in space but is bottlenecked in efficiency. 
+% With the NUFFT algorithm \citen{nufft6}, we can improve the efficiency from $O(N^2)$ to $O(N\log N)$ without sacrificing its spectral accuracy.
+% Note that the NUFFT is simply a fast algorithm for computing a discrete Fourier summation as encountered here. We would like to first present the semi-Lagrangian  method with NUFFT before giving a brief review.
+与局部多项式插值相比，傅里叶插值在空间上是谱精度的，但是在效率方面是瓶颈。使用NUFFT算法\citen{nufft6}，我们可以把效率从$O(N^2)$提高到到$O(N\log N)$，而不牺牲其谱精度。注意，NUFFT仅仅是用于计算这里遇到的离散傅里叶加法的快速算法。我们将介绍使用NUFFT的半拉格朗日方法给出一个简要的介绍。
+
+% We conclude this section with the following remarks. When the vector potential $\mathbf A$ is time independent, the backward characteristic
+% tracing step is also independent of time. In other words, one just
+% needs to solve (\ref{ODE}) for the set of shifted target point $\left\{ x_{j}^{0}\right\} $
+% once with sufficiently small time step, and
+% use them for all future time steps. This step can be done
+% in a preprocessed step with great precision. When the vector potential  
+% is time dependent, i.e., $\mathbf A(x,t)$, the backward characteristic tracing step needs
+% to be done for every time step with $O(N)$ operations.  And still, the choice of the time step for backward tracing is independent of $\varepsilon$ or the time step for the whole method.
+% 我们用以下的话来结束这一节。 当矢量势能$ \ mathbf A $是时间无关的时，向后的特性
+% 跟踪步骤也与时间无关。 换句话说，一个只是
+% 需要为移位的目标点$ \ left \ {x_ {j} ^ {0} \ right \} $的集合求解（\ ref {ODE}
+% 一次以足够小的时间步长，和
+% 使用它们以后的所有时间步骤。 此步骤可以完成
+% 在高精度的预处理步骤。 当矢量电位
+% 是时间相关的，即，反向特性跟踪步骤需要的$ \ mathbf A（x，t）$
+% 对于每个时间步骤用$ O（N）$操作来完成。 而且，向后跟踪的时间步长的选择与$ \ varepsilon $或整个方法的时间步长无关。
+
+\subsection{使用NUFFT的半拉格朗日方法解对流方程}
+% To solve the convection equation (\ref{convection}) with the semi-Lagrangian method, 
+% as shown in previous sections, we are now faced with the following evaluation
+按照前面一节的分析，为了使用半拉格朗日方法解对流方程(\ref{convection})，我们需要计算
+\begin{equation}\label{NUFFT}
+    U^{n+1}_j=u^{\varepsilon}(x^0_j,t_{n}) \approx \sum^{N/2-1}_{k=-N/2}\,\hat{u}^n_k e^{i\mu_k(x^0_j-a)} = \sum^{N/2-1}_{k=-N/2}\,\hat{u}^n_k e^{i k \frac{2\pi (x^0_j-a) }{b-a}}.
+\end{equation}
+
+% In general, the shifted target points $x^0_j$ are not necessarily uniformly distributed, therefore FFT does not apply to the Fourier series summation \eqref{NUFFT} due to the loss of algebraic structure of the transform matrix.
+% The direct summation, which requires $O(N^2)$ arithmetic operations, will bottleneck the efficiency, especially for 2D and 3D problems. 
+% With the NUFFT algorithm, the evaluation \eqref{NUFFT} can be done within $O(N\log N)$ operations. Compared with the $O(N^{2})$ complexity, the efficiency improvement to $O(N\log N)$
+% is quite spectacular. We then incorporate the NUFFT algorithm to the semi-Lagrangian method, and details of the improved method are given as follows 
+
+一般来说，移位的目标点$x^0_j$不一定均匀分布，因此由于变换矩阵的代数结构的破坏，FFT不适用于傅里叶级数求和\eqref{NUFFT}。直接求和，需要$O(N^2)$的运算量，将大大影响效率，特别是对于二维和三维问题。使用NUFFT算法，计算\eqref{NUFFT}可以在$O(N\log N)$的复杂度内完成。与$O(N^{2})$复杂度相比，效率提高到$O(N\log N)$是相当可观的。然后我们将NUFFT算法结合到半拉格朗日方法中，并将改进方法的细节给出如下
+
+\begin{algorithm}
+\caption{使用NUFFT的半拉格朗日方法}
+\label{alg1}
+\begin{algorithmic}[1]
+\State 回溯解出错位的目标点$x_j^0$. 
+\State 使用FFT，由网格点$x_j$计算出$u^{\varepsilon}(x,t_{n})$的傅立叶谱插值。
+\State 使用NUFFT计算\eqref{NUFFT}中的$U^{n+1}_{j}= u^{\varepsilon}(x_j^0,t_{n+1})$。
+\end{algorithmic}
+\end{algorithm}
+
+% The total cost of \ref{alg1} is composed of three parts.
+% Step 1 can be solved by ODE solvers within $O(N)$ operations. The Fourier coefficients in Step 2 can be computed by forward{} FFT within $O(N\log N)$ operations.
+% The evaluation in Steps 3 can be done within  $O(N\log N+N)$ operations by NUFFT. In summary, the total cost is $O(N+N\log N)$.
+% The spatial accuracy is improved from polynomial accuracy to spectral accuracy and numerical confirmation will be presented.  
+% Extensions to multi-dimensional cases are simple and straightforward.
+
+算法\ref{alg1}的总计算复杂度由三部分组成。步骤1可以通过$O(N)$的ODE求解器求解。步骤2中的傅立叶系数可以由$O(N\log N)$复杂度的向前FFT（forward FFT）来计算。步骤3中的计算可以在NUFFT的$O(N\log N+N)$操作内完成。总之，总复杂度是$O(N+N\log N)$，空间精度从多项式精度提高到谱精度。我们将给出出数值验证。对多维情况的推广是简单和直接的。
+
+
+\subsection{NUFFT算法简介}
+% In this section, we present a quite brief review of the NUFFT algorithm.
+% The algorithm is aimed to accelerate Fourier series evaluation, which involves nonuniform points in the physical and/or Fourier domains,
+% up to a complexity of $O(N \log N )$. There exist many versions, here we follow the discussion in \citen{nufft6},
+% which describes a  simple and fast implementation  using Gaussian kernels for interpolation.
+
+在本节中，我们将简要介绍一下NUFFT算法。该算法旨在加速傅里叶级数的计算，其涉及物理空间和频率空间的不均匀点，复杂度最多为$O(N \log N )$。该算法有有很多版本，我们在这里按照\citen{nufft6}中描述的使用高斯内核进行插值的简单且快速的实现。
+
+% We define the nonuniform discrete Fourier transform of type 1 and 2 in one dimension as follows
+我们在一维中定义了类型1和2的不均匀离散傅里叶变换，如下
+\bea
+\label{NUFFT1}
+\text{ 类型 \;1:}&&   F(k)=\sum_{j=0}^{N-1}f_j e^{-i kx_j}, \quad k=-M/2,\ldots,M/2-1,\\[0.5em]
+\label{NUFFT2}
+\text{ 类型 \;2:}&& f(x_j)=\sum^{M/2-1}_{k=-M/2}F(k)e^{i k x_j}, \quad j  =0, 1,\ldots, N,
+\eea
+% where $x_j\in[0,2\pi]$ are nonequispaced  grid points and $f_j$ are complex numbers. 
+其中$x_j\in[0,2\pi]$是不均匀的格点，$f_j$为复数。
+
+% For simplicity, to illustrate the basic underlying idea, we consider the one dimensional type 1 case. The type 2 summation, used in our semi-Lagrangian method, can be viewed as an inverse of type 1 and we refer the readers to \citen{nufft6} for details. Note that equation (\ref{NUFFT1}) describes the exact Fourier coefficients of the function
+简单起见，为了说明基本的基本思想，我们考虑一维类型1的情况。在我们的半拉格朗日方法中使用的类型2求和可以看作是类型1的逆，可以参见\citen{nufft6}。 请注意，方程(\ref{NUFFT1})描述了函数的精确傅里叶系数
+\begin{equation}\label{delta}
+f(x)=\sum_{j=0}^{N-1}f_j\delta(x-x_j),
+\end{equation}
+可以看作$[0,2\pi]$上的周期函数。这里$\delta(x)$是狄拉克$\delta$函数。通过与一维热核（heat kernal）在$[0,2\pi]$上进行卷积，即$g_\tau(x)=\sum_{l=-\infty}^\infty e^{-(x-2l\pi)^2/4\tau}$，我们可以构建一个周期为$2\pi$，$C^{\infty}$的函数$f_{\tau}$如下
+\begin{equation}
+f_\tau(x)=f*g_\tau(x)=\int_0^{2\pi}f(y)g_\tau(x-y)\,dy.
+\end{equation}
+实际上，$f_\tau$是$f$的一个很好的逼近并且可以在$x$的均匀网格上被计算出来。
+%whose  spacing is determined by $\tau$.  
+傅立叶系数$F_\tau(k)=\frac{1}{2\pi}\int_0^{2\pi}f_\tau(x)e^{-i kx}\,dx$可由标准的FFT在一个过抽样（oversampled）的网格上准确的逼近，
+\begin{equation}\label{sFFT}
+F_\tau(k)\approx\frac{1}{M_r}\sum_{m=0}^{M_r-1}f_\tau(2\pi m/M_r)e^{-ik2\pi m/M_r},
+\end{equation}
+这里
+\begin{equation}\label{conv}
+f_\tau(2\pi m/M_r)=\sum_{j=0}^{N-1}f_j g_\tau(2\pi m/M_r-y_j).
+\end{equation}
+一旦我们知道了$F_\tau(k)$，根据卷积理论我们有， 
+\bea
+F(k) = \sqrt{\frac{\pi}{\tau}} e^{k^2 \tau} F_\tau(k).
+\eea
+
+% Optimal choice of related parameters  involves a bit of analysis and we omit it here. Following the argument in \citen{nufft6}, we choose
+% $M_r = 2 M$ and $\tau=12/M^2$ and use a Gaussian to spread each source to its nearest 24 points, then it yields about 12 digits accuracy. 
+% For 6 digits accuracy, we choose $\tau =6/M^2$ and  spread each source to its nearest 12 points.
+% In computation practice, we choose the 12-digit accuracy if not stated otherwise.
+相关参数的最佳选择涉及一些深入的分析，我们在此省略。根据在\citen{nufft6}中的讨论，我们选择$M_r = 2M$和$\tau = 12 / M^2$，并使用高斯函数将每个源扩展到最近的24个点，那么它产生大约12位数的精度。
+对于6位数精度，我们选择$\tau = 6 / M^2$并将每个源分散到最接近的12点。在数值实验中，如果没有另外说明，我们选择12位精度。
+
+%------------------------------------------------------
+
+
+\section{数值分析} 
+% In this section, we shall study the stability, convergence of the wave function and physical observables.
+在这节中，我们将研究波函数与物理观测量的稳定性、收敛性。
+\subsection{稳定性分析}
+对任意函数$u(x) \in  S_{\rm p}$，令$\mathbf{U}=(u(x_0),\cdots,u(x_{N-1}))^T$为$u$的网格向量。定义$\|\cdot\|_{l^2}$为离散的$l^2$范数，
+ $\|\cdot\|_{L^2}$为函数空间$S_{\rm p}$的$L^2$范数
+\begin{equation}
+\|\mathbf{U}\|_{l^2}= \Big(\Delta x \sum_{j=0}^{N-1}|U_j|^2\Big)^{1/2},\quad\|u\|_{L^2}=\Big(\int_a^b |u(x)|^2\,dx\Big)^{1/2}.
+\end{equation}
+经过简单的计算，我们有$\|u_I(x)\|_{L^2}=\|U\|_{l^2}$对于任意的$u \in S_{\rm p}$成立。
+
+\begin{lem}\label{kin-pot-stab}
+	% For every time step $t\in[t_n,t_{n+1}]$, after solving the kinetic step \eqref{kin-1d} and the potential step \eqref{pot-1d}, we have
+	对于每个时间步$t\in[t_n,t_{n+1}]$，在解动能方程\eqref{kin-1d}和势能方程\eqref{pot-1d}后，我们有
+	\begin{equation}
+	\|\mathbf{U}^{**}\|_{l^2}=\|\mathbf{U}^n\|_{l^2}.
+	\end{equation}
+%	where $\mathbf{U}^{**}=(U^{**}_0,\cdots,U^{**}_{N-1})^T$ and $\mathbf{U}^n=(U^n_0,\cdots,U^n_{N-1})^T$.
+\end{lem}
+
+\begin{proof}
+证明和在\citen{BaoJM}中的非常类似，简洁起见我们将其省略。
+\end{proof}
+
+
+% To solve the convection equation with semi-Lagrangian method, one first follows backwards along the characteristics. For the characteristics equation with arbitrary initial point $x_0\in[a,b]$,
+为了用半拉格朗日方法求解对流方程，首先沿着特征回溯。特征线方程在任意给定的初值点$x_0\in[a,b]$，
+\begin{equation}\label{evolution}
+\frac{dx(t)}{dt}=-\mathbf{A}(x(t)),\quad x(t_0)=x_0, \quad x_0\in[a,b].
+\end{equation}
+我们定义$S_{\rm p}$上的映射$E(t,t_{0})$如下
+\begin{equation}
+(E(t,t_0)v)(x_0):=v(x(t)),\quad \; v\in S_{\rm p}.
+\end{equation}
+% Since (\ref{evolution}) is an autonomous system, $E(t,t_0)$ is a function of $t-t_0$ only. For this reason, we will write $E(t-t_0)$ instead of $E(t,t_0)$.
+% If errors coming from the backward tracing and the spectral interpolation are negligible, i.e., $u^{n+1}_I(x_j)$ is ``exact'',  the semi-Lagrangian method using NUFFT can be described as
+由于(\ref{evolution})是一个自治系统，所以$E(t,t_0)$仅是$t-t_0$的函数。 因此，我们将用$E(t-t_0)$表示$E(t,t_0)$。
+如果来自回溯和谱插值的误差是可以忽略的，即$u^{n+1}_I(x_j)$是``精确的''，使用NUFFT的半拉格朗日方法可以描述为
+\begin{equation}\label{sl-method}
+	u_I^{n+1}(x)={\rm II}_{N}E(\Delta t)u_I^{**}(x),
+\end{equation}
+其中$u_I^{**}(x)$是$u^{**}(x)$的谱插值。
+
+\begin{lem}\label{sl-stab}
+	假设$\mathbf{A}\in C^1([a,b])$并且是无旋的，即$\nabla\cdot\mathbf{A}=0$,则半拉格朗日格式(\ref{sl-method})是\textit{无条件稳定的}并且我们有
+	\begin{equation}
+		\|u_I^{n+1}\|_{L^2}\leq \|u_I^{**}\|_{L^2}.
+	\end{equation}
+\end{lem}
+
+\begin{proof}
+	由(\ref{sl-method}),
+	\begin{equation}
+		\|u_I^{n+1}\|_{L^2}=\|{\rm II}_{N}E(\Delta t)u_I^{**}\|_{L^2}\leq \|E(\Delta t)u_I^{**}\|_{L^2},
+	\end{equation}
+	因为$\mathbf{A}$是无旋的，我们有$\|E(\Delta t)\|_{(L^2)^*}\leq 1$及$\|u_I^{n+1}\|_{L^2}\leq \|u_I^{**}\|_{L^2}$.
+\end{proof}
+\begin{rem}
+% The Lemma can also be easily extended to more general $\mathbf{A}$. We refer to \citen{suli} for more discussions.
+该引理很容易推广到更一般的$\mathbf{A}$，可以参见\citen{suli}中更多的讨论。
+\end{rem}
+
+
+结合引理\ref{kin-pot-stab}和\ref{sl-stab}，我们得到如下的稳定性结果，
+\begin{thm}
+	使用NUFFT的半拉格朗日时间分裂谱方法，\eqref{kin-1d-numeric}、\eqref{pot-1d-numeric}及\eqref{NUFFT}，是无条件稳定的。事实上，对于任何网格大小和时间步 
+	\begin{equation}
+	\|\mathbf{U}^{n+1}\|_{l^2}\leq \|\mathbf{U}^{n}\|_{l^2},\quad n=1,2,\cdots
+	\end{equation}
+\end{thm}
+\begin{proof}
+	根据引理\ref{kin-pot-stab}，$\|\mathbf{U}^{**}\|_{l^2}=\|\mathbf{U}^n\|_{l^2}$。由引理\ref{sl-stab}，我们有
+	\begin{equation*}
+	\|\mathbf{U}^{n+1}\|_{l^2}=\|u_I^{n+1}\|_{L^2}\leq\|u_I^{**}\|_{L^2}=\|\mathbf{U}^{**}\|_{l^2}=\|\mathbf{U}^n\|_{l^2}.
+	\end{equation*}
+\end{proof}
+
+
+\subsection{波函数的误差估计}
+% In this section, we study the numerical approximation error of the wave function and the meshing strategy. We assume that the wave function is $\varepsilon-$oscillatory in both space and time. % but the potentials are not.  
+%  More specifically, there exist positive constants $B_m$, $C_m$, $D_m$, 
+% which are independent  of $t$,\,$x$ and $\varepsilon$, such that
+在这节中，我们研究波函数数值逼近的误差及网格策略。我们假设波函数载空间和时间上都是$\varepsilon$振荡的。更具体地说，存在独立于$t$，$x$和$\varepsilon$的正的常数$B_m$，$C_m$，$D_m$使得
+\bea\label{Theo-Assum1}
+&&\left|\left|\frac{\partial^{m_1+m_2}}{\partial x^{m_1}\partial t^{m_2}}u(x,t)\right|\right|_{C([0,T];L^2)}\leq\frac{1}{\varepsilon^{m_1+m_2}}C_{m_{1}+m_{2}}, \quad  m = m_{1}+m_{2}, \;m_{1}, m_{2}\in \mathbb N^{+},\quad  \\
+\label{Theo-Assum2} &&\left|\left|\frac{\partial^m}{\partial x^m}\mathbf{A}(x)\right|\right|_{L^2}\leq D_m,\quad \quad \quad \left|\left|\frac{\partial^m}{\partial x^m}V(x)\right|\right|_{L^2}\leq B_m.
+\eea
+% Note that in \eqref{Theo-Assum1}, the differentiation operator is unbounded for general smooth functions, but it is bounded in the subspace of smooth $L^2$ function which are at most $\varepsilon-$oscillatory. The assumptions \eqref{Theo-Assum2} imply that the potentials are  smooth with $\varepsilon$ independent bounds. We use $f_I$ to denote the spectral approximation based on the discrete data $f(x_j)$ as mentioned in the previous section. Now we can prove the following error estimate for the first order semi-Lagrangian time splitting method (abbreviated by SL-TS) using NUFFT. 
+注意，在\ref{Theo-Assum1}中，差分运算符对于一般光滑函数是无界的，但它在光滑$L^2$函数的子空间中是有界的，最多为$\varepsilon$振荡的。假设\eqref{Theo-Assum2}意味着这些势能函数是光滑的，并且上解独立于$\varepsilon$。我们使用$f_I$来表示基于前面部分提到的离散数据$f(x_j)$的谱近似。现在我们可以证明使用NUFFT的半拉格朗日一阶时间分裂谱方法法（缩写为SL-TS）的以下误差估计。
+
+% The proof basically follows Theorem 4 in \citen{SemiJZ} and also Theorem 4.1 in \citen{BaoJM}, but it differs from the previous versions because it shows spectral accuracy in space in the presence of vector potentials.
+证明基本上遵循\citen{SemiJZ}中的定理4和\citen{BaoJM}中的定理4.1，但与以前的版本不同，因为这是在向量势函数存在的情况下显示了空间中的谱精度。
+
+\begin{thm}\label{err:est}
+	设$u^\varepsilon(x,t)$是方程\eqref{main-1d}的精确解，$u^{\varepsilon,n}$是用一阶SL-TS方法的离散逼近。我们假设能够以可以忽略的误差数值解特征线方程\eqref{ODE}，而且在SL-TS方法中对流步的NUFFT的误差可以忽略。在假设\eqref{Theo-Assum1}-\eqref{Theo-Assum2}下，我们进一步假设$\Delta x=O(\varepsilon)$和$\Delta t=O(\varepsilon)$，那么对于任何时间$t\in[0,T]$，我们有 
+	\begin{equation}
+	\|u^\varepsilon(t_n)-u^{\varepsilon,n}_I\|_{L^2}\leq G_m\frac{T}{\Delta t}\left(\frac{\Delta x}{\varepsilon}\right)^m+\frac{CT\Delta t}{\varepsilon},
+	\end{equation}
+	其中$m\in \mathbb N^{+}$是$u^{\varepsilon}(x,t)$的正则指标，$C$为独立于$\Delta t$，$\Delta x$，$\varepsilon$，$m$的正常数，$G_m$是不依赖于$\Delta t$, $\Delta x$和$\varepsilon$的正常数。
+\end{thm}
+\begin{proof}	
+	% In the proof, the constants involved are assumed to be independent  of $\varepsilon$ if not stated clearly.
+	% For clarity, we rewrite the equation \eqref{main-1d} as
+	在证明中，如果没有明确说明，所涉及的常数被假定为独立于$\varepsilon$。为了清楚起见，我们重写方程\eqref{main-1d}
+	\begin{equation}
+	\partial_t u^\varepsilon=(\mathcal{A}+\mathcal{B}+\mathcal{C})u^\varepsilon,
+	\end{equation}
+	其中
+	$$
+	\mathcal{A}=\frac{i\varepsilon}{2}\Delta,\quad \mathcal{B}=-\frac{i}{\varepsilon}\left(\frac{1}{2}|\mathbf{A}|^2+V\right),\quad \mathcal{C}=\mathbf{A}\cdot\nabla.
+	$$
+	设$u^\varepsilon(t_n)$是在$t=t_n$时的精确解，那么 
+	\begin{equation}
+	u^\varepsilon(t_{n+1})=e^{(\mathcal{A}+\mathcal{B}+\mathcal{C})\Delta t}u^\varepsilon(t_n).
+	\end{equation}
+	% Define the solution obtained by the (first order) operator splitting (without spatial discretization) as
+	定义由（一阶）时间算子分裂获得的解（无空间离散）为
+	\begin{equation}
+	w^{n+1}=e^{\mathcal{C}\Delta t}e^{\mathcal{B}\Delta t}e^{\mathcal{A}\Delta t}u^\varepsilon(t_n).
+	\end{equation}
+	% Note that $w^{n+1}$ differs from $u^\varepsilon(t_{n+1})$ due to the operator splitting error. As shown in \citen{SemiJZ}, the local splitting error  is
+	请注意，由于算子分裂误差，$w^{n+1}$与$u^\varepsilon(t_{n+1})$不同。如\citen{SemiJZ}所示，局部分裂误差是
+	\begin{equation}\label{split-err}
+	\|u^\varepsilon(t_{n+1})-w^{n+1}\|_{L^2}=O\left(\frac{\Delta t^2}{\varepsilon}\right).
+	\end{equation}
+	由三角不等式，得到
+	\begin{equation}\label{local-target}
+	\|u^\varepsilon(t_{n+1})-u^{\varepsilon,n+1}_I\|_{L^2}\leq \|u^\varepsilon(t_{n+1})-w^{n+1}\|_{L^2}+\|w^{n+1}-w^{n+1}_I\|_{L^2}+\|w^{n+1}_I-u^{\varepsilon,n+1}_I\|_{L^2},
+	\end{equation}
+	其中$w^{n+1}_I$是$w^{n+1}$的谱插值逼近。 
+  % The first term of \eqref{local-target} is  the splitting error \eqref{split-err}, the second term gives the spectral approximation error and it is bounded by $C_m(\frac{\Delta x}{\varepsilon})^m$. Up to this point, the analysis agrees with the previous results. But, we need to analyze the last term,  which is the one-step error term introduced by numerical approximations. Especially, since spectral approximation is utilized in the convection step, the resulting error is different from the one in \citen{SemiJZ}, and hence needs to be carefully investigated.
+  \eqref{local-target}的第一项是分裂误差\eqref{split-err}，第二项给出了谱逼近的误差，其上界为$C_m(\frac{\Delta x}{\varepsilon})^m$。到目前为止，分析与以前的结果一致。但是，我们需要分析最后一项，这是通过数值近似引入的误差项。特别的，由于在对流步骤中利用了谱逼近，因此产生的误差与\citen{SemiJZ}不同，因此需要仔细研究。
+
+% In the SL-TS method, the potential step governed by operator $\mathcal{B}$ is solved analytically, while the kinetic step and convection step governed by operators $\mathcal{A}$ and $\mathcal{C}$ are evolved by numerical approximations, denoted by $\mathcal{A}_{SP}$ and $\mathcal{C}_{SL}$ respectively. By triangle inequality:
+在SL-TS方法中，由算子$\mathcal{B}$控制的势能步是通过解析求解的，而算子$\mathcal{A}$和$\mathcal{C}$的动能步骤和对流步是通过数值近似演化的，分别由$\mathcal{A}_{SP}$和$\mathcal{C}_{SL}$表示。由三角不等式：
+	\begin{align}\label{ineq:tri}
+	\|w^{n+1}_I-u^{\varepsilon,n+1}_I\|_{L^2}&=\|w^{n+1}-u^{\varepsilon,n+1}\|_{l^2} \nonumber\\
+	&=\|e^{\mathcal{C}\Delta t}e^{\mathcal{B}\Delta t}e^{\mathcal{A}\Delta t}u^\varepsilon(t_n)-e^{\mathcal{C}_{SL}\Delta t}e^{\mathcal{B}\Delta t}e^{\mathcal{A}_{SP}\Delta t}u^{\varepsilon,n}\|_{l^2} \nonumber\\
+	&\leq \|e^{\mathcal{C}\Delta t}e^{\mathcal{B}\Delta t}e^{\mathcal{A}\Delta t}u^\varepsilon(t_n)-e^{\mathcal{C}\Delta t}e^{\mathcal{B}\Delta t}e^{\mathcal{A}_{SP}\Delta t}u^\varepsilon(t_n)\|_{l^2} \nonumber\\
+	&+\|e^{\mathcal{C}\Delta t}e^{\mathcal{B}\Delta t}e^{\mathcal{A}_{SP}\Delta t}u^\varepsilon(t_n)-e^{\mathcal{C}_{SL}\Delta t}e^{\mathcal{B}\Delta t}e^{\mathcal{A}_{SP}\Delta t}u^\varepsilon(t_n)\|_{l^2} \nonumber\\
+	&+\|e^{\mathcal{C}_{SL}\Delta t}e^{\mathcal{B}\Delta t}e^{\mathcal{A}_{SP}\Delta t}u^\varepsilon(t_n)-e^{\mathcal{C}_{SL}\Delta t}e^{\mathcal{B}\Delta t}e^{\mathcal{A}_{SP}\Delta t}u^{\varepsilon,n}\|_{l^2}.
+	\end{align}
+	\eqref{ineq:tri}右端的第一项表示$u^\varepsilon(t_n)$在动能步的谱逼近，所以如同在\citen{BaoJM,SemiJZ}中的分析，这项的误差为是$O((\frac{\Delta x}{\varepsilon})^m)$（对于任意的正整数$m$）。
+	\eqref{ineq:tri}右端的第二项表示$e^{\mathcal{B}\Delta t}e^{\mathcal{A}_{SP}\Delta t}u^\varepsilon(t_n)$在对流步的数值逼近。根据对动能步和势能步的稳定性分析，
+	$$
+	\| e^{\mathcal{B}\Delta t}e^{\mathcal{A}_{SP}\Delta t}u^\varepsilon(t_n) \|_{l^2}=\| u^\varepsilon(t_n) \|_{l^2}.
+	$$   
+	% Then,  the local error analysis in Section 2 implies that, when the errors in computing the shifted grid points and NUFFT are minimal, the second term is of order $O((\frac{\Delta x}{\varepsilon})^m)$ for any positive integer $m$, which is dominated by the spectral interpolation error. 
+	然后，第2节中的局部误差分析意味着，当计算偏移的网格点和NUFFT的误差很小时，第二项是$O((\frac{\Delta x}{\varepsilon})^m)$，$m$为任意正整数，这里谱插值的误差占主导。
+	
+	% \eqref{ineq:tri}右端的最后一项 links the numerical error of the numerical solutions between two consecutive time steps, where numerical stability is crucial.
+	% It can also easily be shown that the operator $e^{\mathcal{A}\Delta t}$, $e^{\mathcal{B}\Delta t}$ and $e^{\mathcal{C}\Delta t}$ (in the Coulomb gauge) are unitary operators with respect to periodic smooth functions in the $L^2$ norm, which implies $\|e^{\mathcal{A}\Delta t}\|_{L^2}=\|e^{\mathcal{B}\Delta t}\|_{L^2}=\|e^{\mathcal{C}\Delta t}\|_{L^2}=1$. By stability analysis in the previous section, we have shown that \[
+	% \|e^{\mathcal{A}_{SP}\Delta t}\|_{L^2}= 1\quad \|e^{\mathcal{C}_{SL}\Delta t}\|_{L^2}\leq 1.
+	% \] 
+	% So, we conclude the following estimate for  the last term of the right hand side of \eqref{ineq:tri}
+	\eqref{ineq:tri}右端的最后一项连接两个连续时间步长之间的数值解的数值误差，其中数值稳定性至关重要。也可以很容易地看出，运算符$e^{\mathcal{A}\Delta t}$，$e^{\mathcal{B}\Delta t}$和$e^{\mathcal{C}\Delta t}$（在库仑规范下）是$L^2$范数下中的周期光滑函数类的酉运算符，这意味着$\|e^{\mathcal{A}\Delta t}\|_{L^2}=\|e^{\mathcal{B}\Delta t}\|_{L^2}=\|e^{\mathcal{C}\Delta t}\|_{L^2}=1$。 通过上一节的稳定性分析，我们已经证明，
+	\[
+	\|e^{\mathcal{A}_{SP}\Delta t}\|_{L^2}= 1\quad \|e^{\mathcal{C}_{SL}\Delta t}\|_{L^2}\leq 1.
+	\] 
+    因此，我们得出以下估估计，即\eqref{ineq:tri}右侧的最后一项
+	\begin{align}
+	&\|e^{\mathcal{C}_{SL}\Delta t}e^{\mathcal{B}\Delta t}e^{\mathcal{A}_{SP}\Delta t}u^\varepsilon(t_n)-e^{\mathcal{C}_{SL}\Delta t}e^{\mathcal{B}\Delta t}e^{\mathcal{A}_{SP}\Delta t}u^{\varepsilon,n}\|_{l^2} \nonumber\\
+	&\leq \|e^{\mathcal{C}_{SL}\Delta t}\|_{L^2}\|e^{\mathcal{B}\Delta t}e^{\mathcal{A}_{SP}\Delta t}u^\varepsilon(t_n)-e^{\mathcal{B}\Delta t}e^{\mathcal{A}_{SP}\Delta t}u^{\varepsilon,n}\|_{l^2} \nonumber\\
+	&\leq \|e^{\mathcal{C}_{SL}\Delta t}\|_{L^2}\|u^\varepsilon(t_n)-u^{\varepsilon,n}_I\|_{L^2} \nonumber\\
+	&\leq \|u^\varepsilon(t_n)-u^{\varepsilon,n}_I\|_{L^2}.
+	\end{align}
+	推出
+	\begin{equation}
+	\|w^{n+1}_I-u^{\varepsilon,n}_I\|_{L^2}\leq \|u^\varepsilon(t_n)-u^{\varepsilon,n}_I\|_{L^2}+C'_m\left(\frac{\Delta x}{\varepsilon}\right)^m,
+	\end{equation}
+	$C'_m$是独立于$t$，$x$，$\varepsilon$的常数。现在我们有递推关系
+	\begin{equation}
+	\|u^\varepsilon(t_{n+1})-u^{\varepsilon,n+1}_I\|_{L^2}\leq \|u^\varepsilon(t_n)-u^{\varepsilon,n}_I\|_{L^2}+C_1(\frac{\Delta x}{\varepsilon})^m+C_2(\frac{\Delta t^2}{\varepsilon}),
+	\end{equation}
+	$C_1$，$C_2$是独立于$t$，$x$，$\varepsilon$的常数。
+	
+	由$\|u^\varepsilon(t_n)-u^{\varepsilon,n}_I\|_{L^2}$的递推关系和归纳法，我们有
+	\begin{equation}
+	\|u^\varepsilon(t_n)-u^{\varepsilon,n}_I\|_{L^2}\leq G_m\frac{T}{\Delta t}(\frac{\Delta x}{\varepsilon})^m+\frac{CT\Delta t}{\varepsilon}.
+	\end{equation}
+	证毕。	
+\end{proof}
+
+% This theorem implies if $\delta>0$ is the desired error bound in $L^2$ norm such that $\|u^\varepsilon(t_n)-u^{\varepsilon,n}_I\|_{L^2}<\delta$, the corresponding meshing strategy is
+这个定理意味着如果$\delta>0$是$L^2$范数中的误差界，那么$\|u^\varepsilon(t_n)-u^{\varepsilon,n}_I\|_{L^2}<\delta$，相应的网格划分策略是
+\begin{equation}\label{mesh_str}
+\frac{\Delta t}{\varepsilon}=O(\delta),\quad \frac{\Delta x}{\varepsilon}=O(\delta^{1/m}\Delta t^{1/m}),
+\end{equation}
+$m\geq 1$为任意整数。对于高阶算子分裂技术，可以进行类似的分析，这在本文中被省略。
+% For higher order operator splitting technique, similar analysis can be done, which is omitted in this paper. 
+
+% We remark that, the meshing strategy \eqref{mesh_str} agrees with the results in \citen{BaoJM} where only the vector potential is absent, and is obviously better than those in \citen{SemiJZ}, because in that work polynomial interpolation is applied in the semi-Lagrangian method and thus the whole numerical scheme does not have spectral accuracy in space.
+我们指出，网格划分策略\eqref{mesh_str}与\citen{BaoJM}中的结果（没有向量势函数）一致，并且明显优于\citen{SemiJZ}，在这篇参考文献中多项式插值应用于半拉格朗日方法，因此整个数值方案在空间上不具有谱精度。
+
+
+%------------------------------------------------------
+\subsection{物理观测量的误差估计}
+% In general, if one only cares about the physical observables, weaker conditions in the meshing strategy may be sufficient (see \citen{BaoJM,SemiJZ}), where the Wigner transform can be used to illustrate this point. For $f,g\in L^2(\mathbb{R}^d)$, the Wigner transform is defined as a phase-space function
+一般来说，如果只关心物理观测值，则网格划分策略中的条件较弱可能就足够了（参见\citen{BaoJM,SemiJZ}），其中可以使用Wigner变换来说明这一点。对于$f,g\in L^2(\mathbb{R}^d)$，Wigner变换被定义为相空间函数
+\begin{equation}
+w^\varepsilon(f,g)(t,x,\xi)=\frac{1}{(2\pi)^d}\int_{\mathbb{R}^d}e^{iy\cdot\xi}\bar{f}(x-\frac{\varepsilon}{2}y)g(x+\frac{\varepsilon}{2}y)\,dy.
+\end{equation}
+
+定义$w^\varepsilon=w^\varepsilon(u^\varepsilon,u^\varepsilon)$，当$\varepsilon\rightarrow 0$时，Wigner变换收敛到Wigner测度$w^0=\lim\limits_{\varepsilon\rightarrow 0}w^\varepsilon(u^\varepsilon,u^\varepsilon)$，其中的收敛是在弱意义下的。
+
+
+% Let $a(x,\xi)$ be a smooth real-valued phase space function with sufficient decay at infinity, called a semi-classical symbol. Then the self-adjoint pseudo-differential operator $A^\varepsilon:=a(x,\varepsilon D)^W$ is called an observable, here $D=i\nabla_x$ and $W$ stands for the Weyl quantization. Then the average of this observable in this state is defined as
+设$a(x,\xi)$是一个光滑的实值相空间函数，在无限远处有足够的衰减，称为半经典符号。那么，自共轭的拟微分算子$A^\varepsilon:=a(x,\varepsilon D)^W$被称为可观察值，这里$D=i\nabla_x$和$W$表示Weyl量化。那么在这种状态下可观察到的平均值被定义为
+\begin{equation}
+E^\varepsilon_a(t)=\int_{\mathbb{R}^d}\bar{u}^\varepsilon(t,x)(a(x,\varepsilon D)^W u^\varepsilon(t,x))\,dx.
+\end{equation}
+一个重要的性质是对偶等式
+\begin{equation}
+\int_{\mathbb{R}^d}\bar{u}^\varepsilon(t,x)(a(x,\varepsilon D)^W u^\varepsilon(t,x))\,dx=\int_{\mathbb{R}^d\times\mathbb{R}^d}w^\varepsilon(t,x,\xi)a(x,\xi)\,dxd\xi.
+\end{equation}
+$E^\varepsilon_a(t)$可以取半经典极限
+\begin{equation}
+\lim\limits_{\varepsilon\rightarrow 0}E^\varepsilon_a(t)=\int_{\mathbb{R}^d\times\mathbb{R}^d}w^0(t,x,\xi)a(x,\xi)\,dxd\xi.
+\end{equation}
+
+% Let $\tilde{w}^\varepsilon$ be the Wigner transform of the numerical approximation solution. One can easily prove the following inequality
+$\tilde{w}^\varepsilon$是数值近似解的Wigner变换。可以很容易地证明以下的不等式
+\begin{equation}\label{est:ob}
+|E^\varepsilon_a-\tilde{E}^\varepsilon_a|\leq \|a\|_\mathcal{E}\cdot \|w^\varepsilon-\tilde{w}^\varepsilon\|_{\mathcal{E}^*}\leq C\|a\|_\mathcal{E}\cdot \|u^\varepsilon-\tilde{u}^\varepsilon\|_{L^2(a,b)},
+\end{equation}
+对于$a\in\mathcal{E}$，是如下的巴拿赫空间
+\[
+\mathcal{E}=\left\{\phi\in C_0(\mathbb{R}_x^d\times\mathbb{R}_\xi^d):(\mathcal{F}_{\xi\rightarrow v}\phi)\in L^1(\mathbb{R}^d_v;C_0(\mathbb{R}^d_x))\right\}.
+\]
+% $\mathcal{F}$ denotes the Fourier transform and $\mathcal{E}^*$ is the dual space of $\mathcal{E}$. We remark that, when the wave function is decaying sufficiently fast at infinity, the Banach space can be extended.
+$\mathcal{F}$表示傅里叶变换，$\mathcal{E}^*$是$\mathcal{E}$的对偶空间。 我们指出，当波函数在无穷远下衰减得足够快时，可以对Banach空间进行延拓。
+
+% In each time step $t\in[t_n,t_{n+1}]$ after operator splitting, the error in the wave function is introduced due to the spectral approximation and NUFFT (which is minimal). By Theorem \eqref{err:est} and above inequality \eqref{est:ob}, the error in the corresponding Wigner transform can be estimated. 
+在算子分裂后的每个时间步长$t\in[t_n,t_{n+1}]$中，波函数由于谱逼近和NUFFT（很小）导致。根据定理\ref{err:est}及上面的不等式\eqref{est:ob}，可以估计相应Wigner变换中的误差。
+
+% The estimate \eqref{est:ob} implies that, the spatial meshing strategy $\Delta x /{\varepsilon}=O(\delta^{1/m}\Delta t^{1/m})$ is sufficient to guarantee an $O(\delta)$ error in all physical observables caused by spectral approximations on the time interval $[0,T]$.
+估计\eqref{est:ob}意味着，空间网格划分策略$\Delta x / {\varepsilon} = O(\delta^{1 / m} \Delta t^{1 / m})$足以保证在时间间隔$[0,T]$上由谱插值引起的所有物理观察值中的$O(\delta)$误差。
+
+% The splitting error in computing the physical observables, as discussed in \citen{SemiJZ}, is $O(\varepsilon)$ since the limit classical equation is  $\varepsilon$-independent and the time splitting of the Schr\"odinger equation corresponds to the time splitting of the Wigner equation. In the kinetic step and the potential step, the time integrations are performed exactly. In the convection part, the backward characteristic tracing is done in a preprocessed step with sufficiently fine yet $\varepsilon$ independent time steps. Therefore, there is no $\varepsilon$-dependent error at all in time discretizations.
+如\citen{SemiJZ}中讨论的计算物理观测值的分裂误差为$O(\varepsilon)$，因为经典极限方程独立于$\varepsilon$，并且薛定谔方程的时间分裂对应于Wigner方程的分裂。在动能步骤和势能步骤中，时间的演化是精确的，在对流部分中，向后特征回溯在预处理步骤中完成（足够精细的、独立于$\varepsilon$的时间步长） 因此，在时间离散化中，根本没有依赖于$\varepsilon$的误差。
+
+% After all these considerations, we conclude that the SL-TS using NUFFT, can be taken to capture correct physical observables. It means that with time step $\Delta t=O(\delta)$ and spatial meshing strategy $\Delta x = O(\varepsilon)$, one gets numerical solutions with $O(\delta)$ error in the Wigner transforms $\varepsilon\rightarrow 0$, and as a result, $O(\delta)$ error in all the physical observables.
+在所有这些考虑之后，我们得出结论，使用NUFFT的SL-TS可以用于捕获正确的物理观测值。这意味着用时间步长$\Delta t = O(\delta)$和空间网格划分策略$\Delta x = O(\varepsilon)$，数值解在Wigner变换中得到$O(\delta)$误差（当$\varepsilon \rightarrow 0$时），因此所有物理观察值的误差为$O(\delta)$。
+
+
+
+\section{数值例子}
+% In this section, we shall confirm the accuracy and efficiency of the proposed method with extensive one dimensional numerical studies, and  provide simulation examples in two and three dimensional cases. 
+% The reference solutions are obtained by the time-explicit spectral method (TESP) with fine mesh size and time step, 
+% especially the convection equation is solved by the standard fourth order Runge-Kutta method and the spatial derivative was approximated by 
+% the Fourier spectral method \citen{SemiJZ}. Errors in wave function are computed  in $l^2$ norm, while errors of physical observables are measured 
+% by their cumulative function's  $l^2$ norm. 
+在本节中，我们将通过大量的一维数值例子来确认所提方法的准确性和有效性，并在二维和三维情况下提供仿真实例。参考解是通过具有精细网格大小和时间步长的时间显式谱方法（TESP）获得的，其中通过标准四阶Runge-Kutta方法来求解对流方程，空间导数近似由
+傅立叶谱方法\citen{SemiJZ}得到。 波函数的误差以$l^2$范数计算，而物理观测值的误差则被测量通过它们的累积函数的$l^2$范数。
+  
+  
+ \begin{exmp}\label{exmp1d}{\sl 依赖时间的向量势函数}
+ \end{exmp}
+ %  In this example, we take the same one-dimensional  example in  \citen{SemiJZ} with a
+ % time-dependent vector potential. The computation domain is $C = [0,2\pi]$ and the final time is $T = 0.4$. The scalar potential is $V(x) =1$ and the vector potential is $\mathbf{A}(x,t) = \sin(x-2t)/10$. The initial value is $u_0(x) = e^{-10 (x-\pi)^2} e^{i \cos(x)/\varepsilon}$.
+ 在这个例子中，我们使用与\citen{SemiJZ}中相同的一维示例，计算域为$C = [0,2\pi]$，最终时间为$T = 0.4$。标量势为$V(x) =1$，向量势为$\mathbf{A}(x,t) = \sin(x-2t)/10$。初始值为$u_0(x) = e^{-10 (x-\pi)^2} e^{i \cos(x)/\varepsilon}$。
+ 
+ 
+ 
+% Errors of wave function, position density and current density are defined as follows:
+波函数，位置密度和电流密度的误差定义如下：
+\bea 
+E_{u }= \| u_{\Delta t}^{N}-u^{\textrm{ ref}} \|_{l^2} , \quad E_{n }= \| \tilde n_{\Delta t}^{N}-\tilde n^{\textrm{ ref}} \|_{l^1},\quad E_{I  }= \| \tilde I_{\Delta t}^{N}-\tilde I^{\rm ref} \|_{l^1}, 
+\eea
+其中$u_{\Delta t}^{N}$为数值解（$\Delta x = \frac{2\pi}{N}$，$\Delta t $），$u^{\rm ref}$是有非常精细的网格用TESP方法得到的。$\tilde n, \tilde I $是相应的累积函数
+\bea
+\tilde n (x) = \int_0^x n(s) ds , \quad \quad \tilde I (x) = \int_0^x I(s) ds, \quad  0 <x <2\pi.
+\eea
+电流密度定义如下，$I(t,x) = \varepsilon{\rm Im} (\overline u^{\varepsilon}(t,x) \nabla_{x} u^{\varepsilon}(t,x)) 
+= \frac{\varepsilon}{2 {\it i} } ( \overline u^{\varepsilon} \nabla_{x} u^{\varepsilon} - u^{\varepsilon} \nabla_{x} \overline{u^{\varepsilon}})$。
+ 
+ % We show in Table \eqref{ex1_spatial} and Figure \eqref{fig:spat:ex1} that with sufficient fine time step $\Delta t=10^{-6} \varepsilon$, when $\Delta x=O(\varepsilon)$, the errors in the wave function and in the physical observables decrease exponentially fast as the spatial grid points increase until they reach a minimal number, which is dominated by the error in the NUFFT algorithm. Therefore, if the error in NUFFT is negligible, we have confirmed that the proposed method achieves spectral accuracy in space.
+ 我们在表\ref{ex1_spatial}和图\ref{fig:spat:ex1}中看出，当$\Delta x=O(\varepsilon)$时，使用足够的精细时间步长$\Delta t=10^{-6} \varepsilon$，随着空间网格点的增加，波函数和物理观测值中的误差呈指数级降低，直到达到最小，这是由NUFFT算法中的误差所主导的。 因此，如果NUFFT的误差可以忽略不计，我们已经确认了所提出的方法可以实现空间的谱精度。
+ 
+ % For various $\varepsilon$, with correspondingly sufficiently fine spatial mesh size, $\Delta x= \frac{2\pi}{32}\varepsilon$,  we show  the convergence studies in time steps in Table \eqref{ex1_tempo}, and the numerical errors are plotted in Figure \eqref{fig:ex1}. The plots obviously show that we have the second order convergence in $\Delta t$ for both wave functions and physical observables. This agrees with the Strang splitting we have used in the time splitting. 
+ % Also, from Table \eqref{ex1_tempo} we see that, even if $\Delta t \gg \Delta x$ and $\Delta t \gg \varepsilon$, the numerical method is still stable. This verifies the unconditional stability of the whole time splitting spectral method.
+ 对于不同的$\varepsilon$，使用足够精细的空间网格大小，$\Delta x= \frac{2\pi}{32}\varepsilon$，在表\ref{ex1_tempo}中列出关于时间步长的收敛关系，并将数字误差绘制在图\ref{fig:ex1}中。 显然曲线表明，对于波函数和物理观察值，我们都有$\Delta t$的二阶收敛。 这与我们在时间分裂中使用的Strang分裂一致。另外，从表\ref{ex1_tempo}我们看到，即使$\Delta t \gg \Delta x$及$\Delta t \gg \varepsilon$，数值方法仍然是稳定的。这验证了全时间分裂谱方法的无条件稳定性。
+
+% Another important observation to make is, by checking each column of Table \eqref{ex1_tempo}, we learn that, for fixed $\Delta t$, as $\varepsilon$ decreases, the error in the wave functions increases  proportionally, while the error in the physical observables stay almost unchanged. Especially, we observe that (for example, in the first column of Table \eqref{ex1_tempo}), when $\Delta t \gg \Delta x$ and $\Delta t \gg \varepsilon$,
+% the  accuracy in the physical observables are pretty accurate. It justifies that we can take $\varepsilon$ independent time steps to capture correct physical observables. 
+% The simulation time scales like $O(1/\varepsilon)$ if we only compute the physical observables, and it scales like $O(1/\varepsilon^{2})$ if one needs to simulate the wave functions as well.
+另一个重要观察是通过检查表\ref{ex1_tempo}的每一列，我们看到，对于固定的$\Delta t$，当$\varepsilon$减少时，波函数中的误差成比例地增加，而物理观察中的误差几乎保持不变。特别地，我们观察到（例如，在表\ref{ex1_tempo}的第一列中），当$\Delta t \gg \Delta x$和$\Delta t \gg \varepsilon $时，物理观测的准确性非常高。 它证明我们可以采取$\varepsilon$独立的时间步骤来捕获正确的物理观测值。
+如果我们只计算物理观察值，时间步长只需$O(1/\varepsilon)$，如果需要模拟波函数，步长就要$O(1/\varepsilon^{2})$。
+
+
+
+
+ 
+
+\begin{table}[htbp]
+\tabcolsep 0pt 
+\bicaption[ex1_spatial]{例\ref{exmp1d}的空间误差。$\Delta x  =\frac{2\pi}{N}$，$\Delta t = 10^{-6} \varepsilon$，$\varepsilon = 1/32$。参考解由TESP得出，$\Delta x  =\frac{2\pi}{4096}$和$\Delta  t= 10^{-6} \varepsilon$。}{例\ref{exmp1d}的空间误差。$\Delta x  =\frac{2\pi}{N}$，$\Delta t = 10^{-6} \varepsilon$，$\varepsilon = 1/32$。参考解由TESP得出，$\Delta x  =\frac{2\pi}{4096}$和$\Delta  t= 10^{-6} \varepsilon$。}{Table}{Spatial errors computed with  $\Delta x  =\frac{2\pi}{N}$ and very fine time step  $\Delta t = 10^{-6} \varepsilon$ 
+for $\varepsilon = 1/32$  in Example \ref{exmp1d}.  Reference solution is obtained by TESP with  $\Delta x  =\frac{2\pi}{4096}$ and $\Delta  t= 10^{-6} \varepsilon$.}
+%\label{ex1_spatial}
+\begin{center}\vspace{-0.5em}
+\def\temptablewidth{1\textwidth}
+{\rule{\temptablewidth}{1pt}}
+\begin{tabularx}{\temptablewidth}{@{\extracolsep{\fill}}p{1.25cm}lccccc}
+$N$ & $8$ & $16$ & $32$ & $64$ & $128$ & $256$ \\
+\hline
+$E_{u}$& 1.4844E-01  & 2.0897E-01  & 5.4851E-02   &1.1685E-04  & 2.2790E-08 &  2.2602E-08  \\
+$E_{n}$& 1.2187      & 9.3894E-02  & 6.9707E-03   &2.1646E-06  & 6.6955E-09 &  6.3930E-09 \\
+$E_{I}$   & 4.8682E-02  & 3.8011E-02  & 4.5217E-03   &1.4634E-06  & 4.3334E-10 &  4.4653E-10 \\
+\end{tabularx}
+{\rule{\temptablewidth}{1pt}}
+\end{center}
+\end{table}
+
+
+\begin{figure}[t!]
+\centerline{ \psfig{figure=SL_NUFFT/1d/ex1_spat_err.eps,height=6.0cm,width=8cm}}
+\bicaption[fig:spat:ex1]{例\ref{exmp1d}中波函数的$l^2$误差，位置密度的$l^1$误差和电流密度的$l^1$误差与$\Delta x$的对数曲线，$\varepsilon = 1/32$。}{例\ref{exmp1d}中波函数的$l^2$误差，位置密度的$l^1$误差和电流密度的$l^1$误差与$\Delta x$的对数曲线，$\varepsilon = 1/32$。}{Fig}{Log-log plot of errors of the wave function ($l^2$ norm) , the position densities ($l^1$ norm), 
+and current densities ($l^1$ norm) versus mesh sizes $\Delta x$ for $\varepsilon = 1/32$ in Example \ref{exmp1d}.}
+%\label{fig:spat:ex1}
+\end{figure}
+
+
+
+
+
+
+
+
+
+
+\begin{table}[htbp]
+\tabcolsep 0pt 
+\bicaption[ex1_tempo]{时间方向误差，$\Delta x  =\frac{2\pi}{32}\varepsilon$，$\Delta t_j = \frac{1}{10\times 2^j}, j= 1,\ldots,6$。参考解由TESP得到。}{时间方向误差，$\Delta x  =\frac{2\pi}{32}\varepsilon$，$\Delta t_j = \frac{1}{10\times 2^j}, j= 1,\ldots,6$。参考解由TESP得到。}{Table}{Temporal errors computed with $\Delta x  =\frac{2\pi}{32}\varepsilon$ and different time steps 
+$\Delta t_j = \frac{1}{10\times 2^j}, j= 1,\ldots,6$ in Example \ref{exmp1d}.
+Reference solution is obtained by TESP with $\Delta x  =\frac{2\pi}{32}\varepsilon$ and $\Delta  t= 10^{-6} \varepsilon$.}
+%\label{ex1_tempo}
+\begin{center}\vspace{-0.5em}
+\def\temptablewidth{1\textwidth}
+{\rule{\temptablewidth}{1pt}}
+\begin{tabularx}{\temptablewidth}{@{\extracolsep{\fill}}p{1.25cm}lcccccc}
+$E_{u}$&  $\Delta t_1$ & $\Delta t_2$ &$\Delta t_3$ &$\Delta t_4$ &$\Delta t_5$ & $\Delta t_6$  \\
+\hline
+$\varepsilon = \frac{1}{16}$&  1.1461E-05 &  2.8641E-06 &  7.1595E-07 &  1.7898E-07 &  4.4740E-08 &  1.1181E-08\\ 
+%{order}  &&                    2.0005 &  2.0001 &  2.0001 &  2.0001 &  2.0005            \\
+$\varepsilon = \frac{1}{32}$&  1.2923E-05 &  3.2295E-06 &  8.0728E-07 &  2.0181E-07 &  5.0446E-08 &  1.2606E-08\\
+%{order}  &&                    2.0006 &  2.0002 &  2.0001 &  2.0002 &  2.0007            \\
+$\varepsilon = \frac{1}{64}$&  2.0866E-05 &  5.2144E-06 &  1.3034E-06 &  3.2585E-07 &  8.1458E-08 &  2.0361E-08\\
+%{order}  &&                    2.0006 &  2.0002 &  2.0001 &  2.0001 &  2.0002            \\
+$\varepsilon = \frac{1}{128}$& 3.9232E-05 &  9.8038E-06 &  2.4507E-06 &  6.1266E-07 &  1.5316E-07 &  3.8293E-08\\
+%{order}  &&                    2.0006 &  2.0002 &  2.0000 &  2.0000 &  1.9999            \\
+$\varepsilon = \frac{1}{256}$& 7.7212E-05 &  1.9295E-05 &  4.8231E-06 &  1.2057E-06 &  3.0140E-07 &  7.5325E-08\\
+%{order}  &&                    2.0006 &  2.0002 &  2.0001 &  2.0001 &  2.0005            \\
+
+\hline
+$E_{n}$&  $\Delta t_1$ & $\Delta t_2$ &$\Delta t_3$ &$\Delta t_4$ &$\Delta t_5$ & $\Delta t_6$  \\
+\hline
+$\varepsilon = \frac{1}{16}$&  1.2604E-06  & 3.1537E-07  & 7.8930E-08  & 1.9808E-08 &  5.0278E-09  & 1.3343E-09\\ 
+%{order}  &&                    1.9987  & 1.9984  & 1.9945  & 1.9781 &  1.9138            \\
+$\varepsilon = \frac{1}{32}$&  1.0910E-06  & 2.7306E-07  & 6.8388E-08  & 1.7209E-08 &  4.4144E-09  & 1.2172E-09\\
+%{order}  &&                    1.9984  & 1.9974  & 1.9906  & 1.9629 &  1.8586            \\
+$\varepsilon = \frac{1}{64}$&  1.0466E-06  & 2.6205E-07  & 6.5737E-08  & 1.6647E-08 &  4.3745E-09  & 1.3086E-09\\
+%{order}  &&                    1.9977  & 1.9951  & 1.9815  & 1.9281 &  1.7411            \\
+$\varepsilon = \frac{1}{128}$& 1.0356E-06  & 2.5952E-07  & 6.5318E-08  & 1.6756E-08 &  4.6157E-09  & 1.5836E-09\\
+%{order}  &&                    1.9965  & 1.9903  & 1.9628  & 1.8601 &  1.5433            \\
+$\varepsilon = \frac{1}{256}$& 1.0338E-06  & 2.5990E-07  & 6.6230E-08  & 1.7801E-08 &  5.6972E-09  & 2.6858E-09\\
+%{order}  &&                    1.9920  & 1.9724  & 1.8955  & 1.6436 &  1.0849            \\
+
+\hline
+$E_{I}$&  $\Delta t_1$ & $\Delta t_2$ &$\Delta t_3$ &$\Delta t_4$ &$\Delta t_5$ & $\Delta t_6$  \\
+\hline
+$\varepsilon = \frac{1}{16}$&  7.1615E-07 &  1.7901E-07 &  4.4738E-08  & 1.1171E-08 &  2.7788E-09  & 6.8085E-10\\ 
+%{order}  &&                    2.0002 &  2.0005 &  2.0018  & 2.0072 &  2.0291  &          \\
+$\varepsilon = \frac{1}{32}$&  5.1362E-07 &  1.2839E-07 &  3.2084E-08  & 8.0066E-09 &  1.9871E-09  & 4.8226E-10\\
+%{order}  &&                    2.0001 &  2.0006 &  2.0026  & 2.0105 &  2.0428  &          \\
+$\varepsilon = \frac{1}{64}$&  4.6330E-07 &  1.1581E-07 &  2.8932E-08  & 7.2115E-09 &  1.7815E-09  & 4.2398E-10\\
+%{order}  &&                    2.0002 &  2.0010 &  2.0043  & 2.0172 &  2.0710  &          \\
+$\varepsilon = \frac{1}{128}$& 4.5076E-07 &  1.1267E-07 &  2.8138E-08  & 7.0051E-09 &  1.7219E-09  & 4.0109E-10\\
+%{order}  &&                    2.0003 &  2.0015 &  2.0060  & 2.0244 &  2.1020  &          \\
+$\varepsilon = \frac{1}{256}$& 4.4759E-07 &  1.1183E-07 &  2.7889E-08  & 6.9018E-09 &  1.6551E-09  & 3.4344E-10\\
+%{order}  &&                    2.0008 &  2.0036 &  2.0146  & 2.0601 &  2.2688  &           \\
+
+\end{tabularx}
+{\rule{\temptablewidth}{1pt}}
+\end{center}
+\end{table}
+
+
+\begin{figure}[t!]
+\centerline{ \psfig{figure=SL_NUFFT/1d/ex1_wave_err.eps,height=4.5cm,width=5cm}
+\psfig{figure=SL_NUFFT/1d/ex1_dens_err.eps,height=4.5cm,width=5cm} 
+\psfig{figure=SL_NUFFT/1d/ex1_current_err.eps,height=4.5cm,width=5cm} }
+\bicaption[fig:ex1]{例\ref{exmp1d}的波函数（左）、位置密度（中）及电流密度（右）的误差在不同的$\varepsilon$下与时间步长$\Delta t$的对数关系}{例\ref{exmp1d}的波函数（左）、位置密度（中）及电流密度（右）的误差在不同的$\varepsilon$下与时间步长$\Delta t$的对数关系}{Fig}{Log-log plot of the errors of the wave function (left), the position densities (middle), and current densities (right) versus time steps $\Delta t$ for different $\varepsilon$ in Example \ref{exmp1d}.}
+% \label{fig:ex1}
+\end{figure}
+
+
+
+  
+ 
+\begin{exmp}\label{exmp2d}
+{\sl 二维系统的模拟}
+\end{exmp}
+在这个例子中，我们将新方法应用于在\citen{SemiJZ}中详细描述的基本2D模型。向量势为$\mathbf{A} = \frac{1}{2}(-\cos(y),\sin(x))^T$，标量势$V= 0$。初始的波位于$(x_0,y_0) = (0.1, -0.02)$，振荡为$O(\varepsilon)$
+\bea\label{2dInit}
+ u_0(x,y) = e^{-20(x-x_0)^2-20(y-y_0)^2} e^{i \sin(x) \sin(y)/\varepsilon}. 
+\eea
+计算区域为$[-\pi,\pi]\times [-\pi,\pi]$。这里我们对于不同的$\varepsilon = 1/16,1/32,1/64,1/128$数值计算其密度，网格$ h_x = h_y = \frac{2\pi}{16}\varepsilon$，时间步长$\Delta t = 1/50$。
+%  The  reference solution is obtained by our method with the same mesh size but using a very fine time step, i.e., $\Delta t = 1/100\, \,\varepsilon $.
+% Table \eqref{ex2-spatial} shows the spatial errors of the wave function and the position density at time $T = 0.4$ for different $\varepsilon$. Here the position density error is not calculated for cumulative function but for the position density itself.
+% Figure \eqref{fig:ex2}  presents the density's contour plot obtained with large $\Delta t$ for different $\varepsilon =1/32,1/64, 1/128$ (rows from top to bottom with each row corresponding to the same $\varepsilon$ ) at different times $t = 0.4, 0.8$, and the 
+%  the second and the forth columns are reference densities computed with very fine $\Delta t$.  Results shown in Table \eqref{ex2-spatial} and Figure \eqref{fig:ex2} confirm that our method can capture the correct observables with large time step and the spatial errors coincide our analysis
+% given in Theorem \eqref{err:est}.
+参考解是通过我们的方法以相同的网格大小获得的，但使用非常精细的时间步长，即$\Delta t = 1/100\, \,\varepsilon $。表\ref{ex2-spatial}显示了不同的$\varepsilon$的波函数的空间误差和时间$T = 0.4$的位置密度。 这里的位置密度误差不是针对累积函数计算的，而是位置密度本身。图\ref{fig:ex2}显示了对于不同的$\varepsilon = 1 / 32,1 / 64,1 / 128$（从上到下的行，每行对应于相同的$\varepsilon$）在不同的时间$t = 0.4,0.8$，
+ 第二列和第四列是以非常精细$\Delta t$计算的参考密度。表\ref{ex2-spatial}和图\ref{fig:ex2}中显示的结果确认我们的方法可以捕获具有较大时间步长的正确观察值，空间误差与我们的分析相符。
+ 
+
+\begin{table}[htbp]
+\tabcolsep 0pt 
+\bicaption[ex2-spatial]{例\ref{exmp2d}：对于不同的$\varepsilon$，空间方向的误差。$\Delta x  =\frac{2\pi}{16}\varepsilon$，$\Delta t = 1/50$。参考解的由非常小的时间步长$\Delta  t= \varepsilon/100 \,$算出。}{例\ref{exmp2d}：对于不同的$\varepsilon$，空间方向的误差。$\Delta x  =\frac{2\pi}{16}\varepsilon$，$\Delta t = 1/50$。参考解的由非常小的时间步长$\Delta  t= \varepsilon/100 \,$算出。}{Table}{Spatial errors computed with  $\Delta x  =\frac{2\pi}{16}\varepsilon$ and a fixed  time step  $\Delta t = 1/50$ for different $\varepsilon$ in Example \ref{exmp2d}. 
+ Reference solution is obtained with the same mesh size  $\Delta x  =\frac{2\pi}{16}\varepsilon$ and a fine time step $\Delta  t= \varepsilon/100 \,$.}
+% \label{ex2-spatial}
+\begin{center}\vspace{-0.5em}
+\def\temptablewidth{1\textwidth}
+{\rule{\temptablewidth}{1pt}}
+\begin{tabularx}{\temptablewidth}{@{\extracolsep{\fill}}p{1.25cm}lccc}
+$\varepsilon$ &  $1/16$ & $1/32$ & $1/64$ & $1/128$  \\
+\hline
+$E_{u}$ &  4.7093E-06  & 7.3482E-06     &  1.3777E-05 &  2.7109E-05 \\ 
+$E_{n}$   &1.0472E-06 &  1.0528E-06   &1.2366E-06 &  1.3789E-06\\
+%$E_{I}$   & 4.8682E-02  & 3.8011E-02  & 4.5217E-03   &1.4634E-06  & 4.3334E-10 &  4.4653E-10 \\
+\end{tabularx}
+{\rule{\temptablewidth}{1pt}}
+\end{center}
+\end{table}
+
+
+
+
+\begin{figure}[t!]
+%\centerline{ \psfig{figure=SL_NUFFT/2d/eps_1_16_dens_4.eps,height=4.0cm,width=4.0cm}
+%\psfig{figure=SL_NUFFT/2d/eps_1_16_dens_8.eps,height=4.0cm,width=4cm} 
+%\psfig{figure=SL_NUFFT/2d/eps_1_16_dens_4_bench.eps,height=4.0cm,width=4cm}
+%\psfig{figure=SL_NUFFT/2d/eps_1_16_dens_8_bench.eps,height=4.0cm,width=4cm} }
+
+\centerline{ \psfig{figure=SL_NUFFT/2d/eps_1_32_dens_4.eps,height=4.0cm,width=4.0cm}
+\psfig{figure=SL_NUFFT/2d/eps_1_32_dens_4_bench.eps,height=4.0cm,width=4cm}
+\psfig{figure=SL_NUFFT/2d/eps_1_32_dens_8.eps,height=4.0cm,width=4cm} 
+\psfig{figure=SL_NUFFT/2d/eps_1_32_dens_8_bench.eps,height=4.0cm,width=4cm} }
+
+\centerline{ \psfig{figure=SL_NUFFT/2d/eps_1_64_dens_4.eps,height=4.0cm,width=4.0cm}
+\psfig{figure=SL_NUFFT/2d/eps_1_64_dens_4_bench.eps,height=4.0cm,width=4cm}
+\psfig{figure=SL_NUFFT/2d/eps_1_64_dens_8.eps,height=4.0cm,width=4cm} 
+\psfig{figure=SL_NUFFT/2d/eps_1_64_dens_8_bench.eps,height=4.0cm,width=4cm} }
+
+\centerline{ \psfig{figure=SL_NUFFT/2d/eps_1_128_dens_4.eps,height=4.0cm,width=4.0cm}
+\psfig{figure=SL_NUFFT/2d/eps_1_128_dens_4_bench.eps,height=4.0cm,width=4cm}
+\psfig{figure=SL_NUFFT/2d/eps_1_128_dens_8.eps,height=4.0cm,width=4cm} 
+\psfig{figure=SL_NUFFT/2d/eps_1_128_dens_8_bench.eps,height=4.0cm,width=4cm} }
+
+
+
+\bicaption[fig:ex2]{例\ref{exmp2d}：不同时刻$t = 0.4, 0.8$、不同的$\varepsilon= 1/32,1/64,1/128$（从上到下）密度的等值线图，其中第二、四列为参考解。}{例\ref{exmp2d}：不同时刻$t = 0.4, 0.8$、不同的$\varepsilon= 1/32,1/64,1/128$（从上到下）密度的等值线图，其中第二、四列为参考解。}{Fig}{Contour plot of the density computed with $\Delta t = 1/50$ at different times $t = 0.4, 0.8$ for $\varepsilon= 1/32,1/64,1/128$ (rows from top to bottom) in Example \ref{exmp2d}, where
+the second and the forth columns are reference solutions.}
+% \label{fig:ex2}
+\end{figure}
+
+
+ 
+\begin{exmp}\label{exmp3d}{\sl  三维系统的模拟} \end{exmp}
+% In this example,we study a 3D system with constant magnetic field $\vec{B} = B \,(1,1,1)^T$. 
+%The vector potential is chosen as  $\mathbf{A} =-\frac{1}{2} B (y-z,z-x,x-y)^T$ and an homogeneous scalar potential , i.e., $V= 0$.  
+% The last example we want to study is a  3D model, which is the most physics relevant, since  most magnetic effects of quantum systems take place in the 3D space, which in general can not be reduced to lower dimensional subspaces.
+我们要研究的最后一个例子是一个3D模型，这是最具物理意义的，因为量子系统的大多数磁效应发生在3D空间中，通常不能将其减小到较小维度的子空间。
+
+% It is worth pointing out that the model \eqref{eq:main1} we have studied is highly related to the Pauli equation, which  describes quantum evolution of spin-half particles in  an external electromagnetic field.
+% In an electromagnetic field described by the vector potential $\mathbf {A} $ and scalar electric potential $V({x})$, the Pauli equation reads as
+值得指出的是，我们研究的模型\eqref{eq:main1}与Pauli方程高度相关，Pauli方程描述了外部电磁场中自旋半粒子的量子演化。
+在由向量势$\mathbf{A}$和标量势$V({x})$描述的电磁场中，Pauli方程为
+\begin{equation}\label{eq: Stern-Gerlach}
+	i\varepsilon\partial_t\bm{u}^\varepsilon = \big[\frac{1}{2}(-i\varepsilon\nabla-\bm{A})^2 + V({x})\big]\bm{I}\bm{u}^\varepsilon - \frac{1}{2}(\bm{\sigma}\cdot\mathbf{B})\bm{u}^\varepsilon,
+\end{equation}
+% where $\bm{\sigma} = (\sigma_x, \sigma_y, \sigma_z)$ are the Pauli matrices and $\bm{u}^\varepsilon = (u^\varepsilon_+, u^\varepsilon_-)^T$ is the two-component spinor wave function. 
+% Here, $\bm{I}$ is the $2\times 2$ identity matrix which acts as an identity operator and $\bm{B} = \nabla\times\bm{A}$ is the magnetic field.
+其中$\bm{\sigma} = (\sigma_x, \sigma_y, \sigma_z)$是Pauli矩阵，$\bm{u}^\varepsilon = (u^\varepsilon_+, u^\varepsilon_-)^T$是双分量旋转波函数。
+这里，$\bm{I}$是作为运算符的$2\times 2$单位矩阵，$\bm{B} = \nabla\times\bm{A}$是磁场。
+
+% The last term of (\ref{eq: Stern-Gerlach}), the so-called  Stern-Gerlach term, leads to the anomalous Zeeman effect. If we drop this Stern-Gerlach term and consider a simplified version:
+% (\ref{eq: Stern-Gerlach})的最后一项，即所谓的Stern-Gerlach项，导致了反常塞曼效应。 如果我们删除这个Stern-Gerlach项，并考虑一个简化版本：
+\begin{equation}
+	i\varepsilon\partial_t\bm{u}^\varepsilon = \big[\frac{1}{2}(-i\varepsilon\nabla-\bm{A})^2 + V(\bm{x})\big]\bm{I}\bm{u}^\varepsilon.
+\end{equation} 
+% Then, $\bm{u}^\varepsilon$ can be decoupled and the equation for each component takes the same form as (\ref{eq:main1}). 
+然后，$\bm{u}^\varepsilon$可以解耦，每个分量的方程与(\ref{eq:main1})的形式相同。
+
+
+% In this test, we study a 3D system with constant magnetic field $\bm{B} = B \,(0,0,1)^T$. 
+% The vector potential is chosen as  $\mathbf{A} =\frac{B}{2}  (-y,x,0)^T$ and we choose a homogeneous scalar potential , i.e., $V= 0$.  
+% The initial wave function is chosen as a double-well function with $O(\varepsilon)$ oscillation in phase, i.e., 
+在这个测试中，我们研究了具有恒定磁场的三维系统$\bm{B} = B \,(0,0,1)^T$。
+向量势选择为$\mathbf{A} =\frac{B}{2} (-y,x,0)^T$。
+初始波函数为具有$O(\varepsilon)$振荡的双阱函数，即，
+ \bea\label{3dInit}
+ u_0(x,y,z) = (e^{-20(x-x_0)^2-20y^2-20z^2}+e^{-20(x+x_0)^2-20y^2-20z^2}) e^{i \sin(y)\sin(z)/\varepsilon} ,
+ \eea
+% with $x_0= 0.5$. 
+% The computation domain is chosen as $[-4,4]^3$.
+% Here, we numerically compute the density evolution for $\varepsilon = 1/16$ with mesh size $ h_x = h_y = h_z = \frac{1}{32}$ 
+% and time step $\Delta t = 1/40$. 
+其中$x_0 = 0.5$。计算域为$[-4,4]^3$。
+在这里，我们以网格大小$ h_x = h_y = h_z = \frac{1}{32} $的数值计算$\varepsilon = 1/16 $的密度演化，时间步长$\Delta t = 1/40 $。
+
+
+图\ref{fig:ex3}展示了在不同的时间呈现密度的等值面，$n(\bx)= 10^{-4}$。
+\begin{figure}[t!]
+\centerline{ 
+\psfig{figure=SL_NUFFT/3d/dens_kth_0.pdf, height=4.5cm,width=5cm}
+\psfig{figure=SL_NUFFT/3d/dens_kth_15.pdf,height=4.5cm,width=5cm}
+\psfig{figure=SL_NUFFT/3d/dens_kth_25.pdf,height=4.5cm,width=5cm}
+}
+
+\centerline{ 
+\psfig{figure=SL_NUFFT/3d/dens_kth_40.pdf, height=4.5cm,width=5cm}
+\psfig{figure=SL_NUFFT/3d/dens_kth_55.pdf,height=4.5cm,width=5cm}
+\psfig{figure=SL_NUFFT/3d/dens_kth_65.pdf,height=4.5cm,width=5cm}
+}
+
+\centerline{ 
+\psfig{figure=SL_NUFFT/3d/dens_kth_75.pdf, height=4.5cm,width=5cm}
+\psfig{figure=SL_NUFFT/3d/dens_kth_90.pdf, height=4.5cm,width=5cm}
+\psfig{figure=SL_NUFFT/3d/dens_kth_110.pdf,height=4.5cm,width=5cm}
+}
+
+\bicaption[fig:ex3]{例\ref{exmp3d}：不同时刻的密度的等值面。$n(x,y,z) = 10^{-4}$，$\varepsilon= 1/16$。}{例\ref{exmp3d}：不同时刻的密度的等值面。$n(x,y,z) = 10^{-4}$，$\varepsilon= 1/16$。}{Fig}{Isosurface of the density, $n(x,y,z) = 10^{-4}$, at different times for $\varepsilon= 1/16$ in Example \ref{exmp3d}.}
+% \label{fig:ex3}
+\end{figure}
+
+ 
+
+
+\section{本章总结与展望}
+
+% In this paper, we have proposed and analyzed a new time splitting spectral method for the  semi-classical Schr\"odinger equation with vector potentials, where the NUFFT technique is applied in the interpolation step of the semi-Lagrangian method for the convection part. We have analyzed stability and accuracy of this method in approximating the wave function and in computing physical observables. Various numerical tests in one dimensional and up to three dimensional cases have been shown to verify the analytical results.
+在本章中，我们提出并分析了具有向量势的半经典薛定谔方程的新的时间分裂谱方法，其中在对流部分的半拉格朗日方法的插值步骤中应用NUFFT技术。 我们分析了近似波函数和计算物理观测值的方法的稳定性和准确性。并且通过大量一维和三维情况下的各种数值测试来验证分析结果。
+
+% The semi-classical Schr\"odinger equation in electromagnetic field itself is of great significance both in theory and in applications, 
+% and studies of this model prepare us well for more complicated and important quantum mechanical models. For example, by incorporating the  Stern--Gerlach term, the 
+% Schr\"{o}dinger equation becomes the Pauli equation, which is the quantum wave equation for spinors. Also, if the wave function models the quantum state of a charged particle, one can consider self-induced field by coupling the current equation with the Poisson equation or the Maxwell equations. 
+电磁场的半经典薛定谔方程在理论和应用上都具有重要的意义，这个模型的研究为更复杂和重要的量子力学模型提供了好的基础（例如，通过并入Stern-Gerlach项）。另外，如果要通过波函数模拟带电粒子的量子态，那么可以通过将电流方程与泊松方程与麦克斯韦方程联立进行计算，将作为未来的研究方向。
+
+
+% \section*{Acknowledgments}
+% We acknowledge the support from the ANR-FWF Project Lodiquas ANR-11-IS01-0003,  
+% the Schr\"{o}dinger Fellowship J3784-N32, the ANR project Moonrise ANR-14-CE23-0007-01 and the Natural Science Foundation of China grants  11261065, 91430103 and 11471050 (Y. Zhang), 
+% support from the NSF Grant RNMS (Ki--Net) 1107444 (Z. Zhou), 
+% the NSF grant DMS--1522184, DMS--1107291: RNMS (KI-Net) and Natural Science Foundation of China grant 91330203 (Z. Ma).
+
+
+
+%\appendix
+% redefine the command that creates the equation no.
+%\setcounter{equation}{0}  % reset counter
+
+
+% \section{质量和能量守恒的证明}
+% % In this appendix, we briefly present the proof for mass and energy conservation.  We assume the wave function lies in 
+% % Schwartz space $S(\mathbb R^d)$ hereafter.
+% 在本附录中，我们简要介绍了质量和能量守恒的证明。我们假设波函数在
+% Schwartz空间$S(\mathbb R^d)$中。
+
+% \subsection{质量守恒}
+% \begin{proof}
+% 对于$u^{\varepsilon}\in C(\mathbb{R}_t;L^2(\mathbb{R}^d))$，首先注意到$(-i\varepsilon\nabla-\mathbf{A})$是自共轭算子，即，
+% \begin{equation}
+% \langle(-i\varepsilon\nabla-\mathbf{A})f,g\rangle=-i\varepsilon\langle\nabla f,g\rangle-\langle\mathbf{A}f,g\rangle
+% =\langle f,(-i\varepsilon\nabla-\mathbf{A})g\rangle.
+% \end{equation}
+% 直接计算得出
+% \begin{equation}\nonumber
+% \frac{d}{dt}\| u^{\varepsilon}\|_{L^2}=\frac{d}{dt}\langle u^{\varepsilon},u^{\varepsilon}\rangle=\langle\partial_t u^{\varepsilon},u^{\varepsilon}\rangle+\langle u^{\varepsilon},\partial_t u^{\varepsilon}\rangle =0.
+% \end{equation}
+% \end{proof}
+% \vspace{-1.0cm}
+% \subsection{能量守恒}
+% \begin{proof}
+% 对$\mathcal E(t)$求导，我们有 
+% \[
+% \frac{d}{dt}\mathcal E(t)=(I)+(II),
+% \]
+% 其中
+% \begin{align*}
+% (I)&:=\frac{1}{2}\langle(-i\varepsilon\nabla-\mathbf{A})\partial_t u^{\varepsilon},(-i\varepsilon\nabla-\mathbf{A})u^{\varepsilon}\rangle+\frac{1}{2}\langle (-i\varepsilon\nabla-\mathbf{A})u^{\varepsilon},(-i\varepsilon\nabla-\mathbf{A})\partial_t u^{\varepsilon}\rangle, \\
+% (II)&:=\langle\partial_t u^{\varepsilon},Vu^{\varepsilon}\rangle+\langle u^{\varepsilon},V\partial_t u^{\varepsilon}\rangle.
+% \end{align*}
+% 由$(-i\varepsilon\nabla-\mathbf{A})$是自共轭算子，我们有
+% \begin{align*}
+% (I)=&\frac{1}{2}\langle(-i\varepsilon\nabla-\mathbf{A})\left(\frac{1}{2i\varepsilon}(-i\varepsilon\nabla-\mathbf{A})^2 u^{\varepsilon}+\frac{V}{i\varepsilon}u^{\varepsilon}\right),(-i\varepsilon\nabla-\mathbf{A})u^{\varepsilon}\rangle\\
+% &+\frac{1}{2}\langle(-i\varepsilon\nabla-\mathbf{A})u^{\varepsilon},(-i\varepsilon\nabla-\mathbf{A})\left(\frac{1}{2i\varepsilon}(-i\varepsilon\nabla-\mathbf{A})^2 u^{\varepsilon}+\frac{V}{i\varepsilon}u^{\varepsilon}\right)\rangle\\
+% =&\frac{1}{2}\langle\frac{1}{2i\varepsilon}(-i\varepsilon\nabla-\mathbf{A})^2 u^{\varepsilon}+\frac{V}{i\varepsilon}u^{\varepsilon},(-i\varepsilon\nabla-\mathbf{A})^2u^{\varepsilon}\rangle\\
+% &+\frac{1}{2}\langle(-i\varepsilon\nabla-\mathbf{A})^2 u^{\varepsilon},\frac{1}{2i\varepsilon}(-i\varepsilon\nabla-\mathbf{A})^2 u^{\varepsilon}+\frac{V}{i\varepsilon}u^{\varepsilon}\rangle\\
+% =&\frac{1}{2i\varepsilon}\langle Vu^{\varepsilon},(-i\varepsilon\nabla-\mathbf{A})^2 u^{\varepsilon}\rangle-\frac{1}{2i\varepsilon}\langle(-i\varepsilon\nabla-\mathbf{A})^2 u^{\varepsilon},Vu^{\varepsilon}\rangle. 
+% \end{align*}
+% 类似的，
+% \begin{align*}
+% (II)=&\langle \frac{1}{2i\varepsilon}(-i\varepsilon\nabla-\mathbf{A})^2 u^{\varepsilon}+\frac{V}{i\varepsilon}u^{\varepsilon},Vu^{\varepsilon}\rangle+\langle Vu^{\varepsilon},\frac{1}{2i\varepsilon}(-i\varepsilon\nabla-\mathbf{A})^2 u^{\varepsilon}
+% +\frac{V}{i\varepsilon}u^{\varepsilon}\rangle \\
+% =&\frac{1}{2i\varepsilon}\langle(-i\varepsilon\nabla-\mathbf{A})^2 u^{\varepsilon},Vu^{\varepsilon}\rangle-\frac{1}{2i\varepsilon}\langle Vu^{\varepsilon},(-i\varepsilon\nabla-\mathbf{A})^2 u^{\varepsilon}\rangle = -(I).
+% \end{align*}
+% 因此我们有$(I)+(II)=0$，也就说明了$\mathcal E(t) = \mathcal E(0)$。
+% \end{proof}
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \begin{thebibliography}{00}
+
+
+% %% === B %%
+% %
+
+% \bibitem{magstudy}
+% J. Avron, I. Herbst and B. Simon, Schr\"{o}dinger
+% operators with magnetic fields. I. General interactions, Duke Math. J. 45 (1978) 847-883.
+
+% \bibitem{SP-NUFFT}
+% W. Bao, S. Jiang,  Q. Tang and Y. Zhang,
+% Computing the ground state and dynamics of the nonlinear Schr\"{o}dinger equation with nonlocal interactions via the nonuniform FFT,
+% J. Comput. Phys. 296 (2015) 72-89.
+
+
+% \bibitem{BaoJM}
+% W. Bao, S. Jin and P.A. Markowich, Time-splitting spectral
+% approximations for the Schr\"{o}dinger equation in the semiclassical regime, J.
+% Compt. Phys. 175 (2002) 487-524.
+
+% \bibitem{BaoJM2}
+% W. Bao, S. Jin and P.A. Markowich, Numerical studies of time-splitting
+% spectral discretizations of nonlinear Schr\"{o}dinger equations in the
+% semiclassical regime, SIAM J. Sci. Compt. 25 (2003) 27-64.
+
+
+% \bibitem{Dip-NUFFT}
+% W. Bao, Q. Tang and Y. Zhang, Accurate and efficient numerical methods for computing ground states and dynamics
+% of dipolar Bose-Einstein condensates via the nonuniform FFT, Commun. Comput. Phys. 19 (5) (2016) 1141-1166.
+
+
+
+% \bibitem{ME}
+% S. Blanes, F. Casas, J.A. Oteo and J. Ros, The Magnus expansion and some of its applications, Phys. Rep. 470 (2009) 151-238.
+
+
+% \bibitem{SplitNonAuto}
+% S. Blanes, F. Diele, C. Marangi and S. Ragni, Splitting and composition methods for explicit time dependence in separable dynamical systems,
+%  J. Comput. Appl. Math. 235 (2010) 646-659.
+
+% \bibitem{nufft2}
+%  A. Dutt and V. Rokhlin, Fast Fourier transforms for nonequispaced data, SIAM J. Sci. Comput. 14 (1993) 1368-1393.
+ 
+%  \bibitem{high_freq_waves}
+%  B. Engquist and O. Runborg, Computational high
+% frequency wave propagation, Acta Numer. 12 (2003) 181-266.
+ 
+%  \bibitem{FGL}
+%  E. Faou, V. Gradinaru and Ch. Lubich, Computing
+% semiclassical quantum dynamics with Hagedorn wavepackets, SIAM J. Sci. Comput. 31(2009) 3027-3041 .
+ 
+%  \bibitem{Newsplitting}
+% V. Gradinaru and G.A. Hagedorn, Convergence of
+% a semiclassical wavepacket based time-splitting for the Schr\"{o}dinger equation, Numer. Math. 126 (2013) 1-21 .
+
+%  \bibitem{nufft6}
+%  L. Greengard and J-Y. Lee,  Accelerating the nonuniform fast Fourier transform, SIAM Rev. 46 (2004) 443-454.
+
+
+% \bibitem{Hagedornraising}
+% G.A. Hagedorn, Raising and lowering operators
+% for semi-classical wave packets, Ann. Phys. 269 (1998) 77-104 .
+
+% \bibitem{Ejheller}
+% E.J. Heller, Time dependent approach to semiclassical dynamics, J. Chem. Phys. 62 (1975) 1544-1555 .
+
+% \bibitem{JGB}
+%  S. Jiang, L. Greengard and W. Bao, Fast and accurate evaluation of  nonlocal
+% Coulomb and  dipole-dipole  interactions via the nonuniform FFT, SIAM J. Sci. Comput. 36 (2014) B777-B794.
+
+% \bibitem{multi-phase}
+% S. Jin and X. Li, Multi-phase computations of the
+% semiclassical limit of the Schr$\ddot{\textrm{o}}$dinger equation
+% and related problems: Whitham vs Wigner, Phys. D: Nonlinear Phenom.
+% 182  (2003) 46-85.
+
+% \bibitem{reviewsemiclassical}
+% S. Jin, P. A. Markowich and C. Sparber, Mathematical and computational methods for semiclassical Schr\"{o}dinger
+% equations, Acta Numer.  20 (2011) 121-209 .
+
+
+% \bibitem{level_set}
+% S. Jin and S. Osher, A level set method for the computation
+% of multi-valued solutions to quasi-linear hyperbolic PDE's and Hamilton-Jacobi
+% equations, Commun. Math. Sci. 1 (2003) 575-591.
+
+
+% \bibitem{EGB}
+% S. Jin, H. Wu and X. Yang, Gaussian beam methods for
+% the Schr\"{o}dinger equation in the semi-classical
+% regime: Lagrangian and Eulerian formulations, Commun. Math. Sci. 6  (2008) 995-1020.
+
+% \bibitem{HEGB}
+% S. Jin, H. Wu and X. Yang, Semi-Eulerian and high
+% order Gaussian beam methods for the Schr\"{o}dinger
+% equation in the semiclassical regime, Commun. Comput. Phys. 9 (2011) 668-687.
+
+% \bibitem{SemiJZ}
+% S. Jin and Z. Zhou, A semi-Lagrangian time splitting method for the Schr\"{o}dinger equation with vector potentials, 
+% Communications in Information and Systems 13 (2013) 247-289.
+
+% \bibitem{ErrorestiGB}
+% H. Liu, O. Runborg and Tanushev, Error estimates for Gaussian beams, Math. Comp. 82 (2013) 919-952 .
+
+% \bibitem{Popov}
+% M. M. Popov, A new method of computation of wave fields
+% using Gaussian beams, Wave Motion 4 (1982) 85-97.
+
+% \bibitem{FGBtrans}
+% J. Qian and L. Ying, Fast Gaussian wave pack transforms and Gaussian beams for the Schr\"{o}dinger equation,
+% J. Comput. Phys. 229 (2010) 7848-7873.
+
+% \bibitem{Gaussian_propagation}
+% J. Ralston, Gaussian beams and the
+% propagation of singularities, Studies in partial differential equations 23 (1982) 206-248.
+
+
+% \bibitem{GBTrans}
+% G. Russo and P. Smereka, The Gaussian wave packet
+% transform: Efficient computation of the semi-classical limit of the
+% Schr\"{o}dinger equation. Part 1-Formulation and the
+% one dimensional case, J. Comput. Phys. 233 (2013) 192-209.
+
+% \bibitem{GBTrans2}
+% G. Russo and P. Smereka, The Gaussian wave packet transform: Efficient computation of the semi-classical limit of the  Schr$\ddot{\textrm{o}}$dinger equation. Part 2. Multidimensional case, J. Comput. Phys. 257 (2014) 1022-1038.
+
+% \bibitem{ST}
+% J. Shen and T. Tang, Spectral and High-Order Methods with
+% Applications, Science Press, Beijing, 2006.
+
+% \bibitem{QO}
+% M.O. Scully and M.S. Zubairy, Quantum optics, Cambridge University Press (1997).
+
+
+% \bibitem{suli}
+% E. S\"{u}li and A. Ware, A spectral method of characteristics for hyperbolic problems, SIAM J. Appl. Math. 28 (1991) 423--445.
+
+% \bibitem{HGBT}
+% N.M. Tanushev, Superpositions and higher order Gaussian
+% beams, Commun. Math. Sci. 6 (2008) 449-475.
+
+% \bibitem{interfaceGB}
+% D. Yin and C. Zheng, Gaussian beam formulation
+% and interface conditions for the one-dimensional linear Schr\"{o}dinger
+% equation, Wave Motion 48 (2011) 310-324.
+
+% \bibitem{HagedornV}
+% Z. Zhou, Numerical approximation of the Schr\"{o}dinger equation with the electromagnetic field by the Hagedorn wave packets, J. Comput. Phys. 
+% 272  (2014) 386-40.
+
+% \end{thebibliography}
+
+% \end{document}
+
